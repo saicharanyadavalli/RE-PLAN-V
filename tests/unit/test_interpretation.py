@@ -164,3 +164,25 @@ def test_live_llm_provider_fallback():
     provider = LiveLLMProvider(api_key=None)  # No key -> fallback to mock
     proposal = provider.interpret("stack b1 on b2", domain)
     assert proposal.entities == {"b1": "block", "b2": "block"}
+
+
+def test_task_proposal_schema_conversion():
+    from interpretation.schemas.task_spec import TaskProposal
+
+    tp = TaskProposal(
+        task_id="t1",
+        raw_prompt="stack b1 on b2",
+        entities={"b1": "block", "b2": "block"},
+        initial_facts=[FactSchema(predicate="clear", arguments=("b1",))],
+        goal_facts=[FactSchema(predicate="on", arguments=("b1", "b2"))],
+        negative_constraints=[FactSchema(predicate="holding", arguments=("b2",))],
+        invariants=[],
+        confidence=0.95,
+    )
+    contract = tp.to_contract_schema()
+    assert contract.task_id == "t1"
+    assert contract.entities["b1"] == "block"
+    assert contract.confidence == 0.95
+    assert len(contract.initial_facts) == 1
+    assert len(contract.goal_facts) == 1
+

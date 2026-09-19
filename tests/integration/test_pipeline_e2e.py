@@ -128,3 +128,30 @@ class TestFastAPIRoutesE2E:
         assert "summary" in data
         assert "OURS_CounterexampleRepair" in data["summary"]
         assert "B3_GenericRegeneration" in data["summary"]
+
+
+class TestCLIExecution:
+    """Tests CLI entry points and benchmark invocation."""
+
+    def test_run_cli_interactive(self, monkeypatch, capsys):
+        from app.main import run_cli_interactive
+        run_cli_interactive(algorithm="A*")
+        captured = capsys.readouterr()
+        assert "RE-PLAN-V CLI Pipeline Demonstration" in captured.out
+        assert "Final Verified Plan" in captured.out
+
+    def test_run_cli_benchmark(self, capsys):
+        from app.main import run_cli_benchmark
+        run_cli_benchmark(num_instances=2, seed=42)
+        captured = capsys.readouterr()
+        assert "RE-PLAN-V Empirical Evaluation Benchmark" in captured.out
+        assert "OURS_CounterexampleRepair" in captured.out
+
+    def test_main_cli_dispatch(self, monkeypatch):
+        import sys
+        from app.main import main
+
+        monkeypatch.setattr(sys, "argv", ["app.main", "--mode", "cli", "--algorithm", "BFS"])
+        ret = main()
+        assert ret == 0
+
