@@ -80,6 +80,13 @@ class ConsistencyValidator:
         if holding_facts and handempty_facts:
             errors.append("Contradictory state: robot cannot be holding an object while handempty() holds.")
 
+        # Check holding(x) and on_table(x) mutex
+        for h in holding_facts:
+            if h.arguments:
+                held_obj = h.arguments[0]
+                if any(f.predicate.lower() == "on_table" and f.arguments and f.arguments[0] == held_obj and not f.is_negated for f in proposal.initial_facts):
+                    errors.append(f"Mutex violation: object '{held_obj}' cannot be simultaneously holding and on_table.")
+
         if errors:
             status = ValidationStatus.CONTRADICTION if "Contradiction" in errors[0] else ValidationStatus.SCHEMA_ERROR
             if any("Unknown entity" in e for e in errors):
