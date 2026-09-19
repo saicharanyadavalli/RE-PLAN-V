@@ -69,3 +69,42 @@ class AblationStudyRunner:
         else:
             # Default to full system
             return self.full_system.run(instance, domain, initial_candidate)
+
+    def run_ablation_experiment(
+        self,
+        num_instances: int = 10,
+        seed: int = 42,
+    ) -> Dict[str, Any]:
+        """Runs comparative ablation experiments across all configurations."""
+        from benchmark.generator.generator import BenchmarkGenerator
+        from core.actions.domain import create_blocks_world_domain
+        from core.contracts import GroundActionSchema
+        from evaluation.metrics.collector import MetricsCollector
+
+        domain = create_blocks_world_domain()
+        gen = BenchmarkGenerator(seed=seed)
+        instances = gen.generate_suite("blocks_world", count=num_instances, inject_faults=False)
+
+        variants = ["full", "without_verifier", "without_repair"]
+        collectors = {v: MetricsCollector(f"Ablation_{v}") for v in variants}
+
+        for inst in instances:
+            first_goal = inst.goal_facts[0]
+            invalid_candidate = PlanSchema(
+                actions=[GroundActionSchema(name="stack", arguments=tuple(first_goal.arguments))],
+                algorithm="InvalidCandidate",
+            )
+            for v in variants:
+                res = self.run_ablation(v, inst, domain, initial_candidate=invalid_candidate)
+                collectors[v].record_run(res)
+
+        results = {
+            "experiment": "Component Ablation Study",
+            "num_instances": num_instances,
+            "seed": seed,
+            "ablation_runs": {
+                v: {"summary": collectors[v].compute_summary().model_dump()}
+                for v in variants
+            },
+        }
+        return results

@@ -1,0 +1,153 @@
+{
+  "timestamp": 1789837875.3751593,
+  "elapsed_seconds": 0.08442989999821293,
+  "primary_results": {
+    "experiment": "Primary Research Question: Counterexample-Guided Repair vs Generic Regeneration",
+    "num_instances": 5,
+    "seed": 42,
+    "recovery_advantage": 0.0,
+    "summary": {
+      "B0_DirectNeural": {
+        "experiment_id": "B0_DirectNeural",
+        "total_instances": 5,
+        "valid_plan_rate": 0.0,
+        "goal_success_rate": 0.0,
+        "constraint_violation_rate": 1.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 0.0,
+        "avg_planning_time_ms": 0.210499999957392,
+        "avg_verification_time_ms": 0.03887999919243157,
+        "avg_repair_time_ms": 0.210499999957392,
+        "avg_nodes_expanded": 0.0,
+        "avg_plan_cost": 0.0,
+        "fault_attribution_accuracy": 1.0,
+        "recovery_advantage_over_regeneration": 0.0
+      },
+      "B1_FormalizedPlanner": {
+        "experiment_id": "B1_FormalizedPlanner",
+        "total_instances": 5,
+        "valid_plan_rate": 1.0,
+        "goal_success_rate": 1.0,
+        "constraint_violation_rate": 0.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 0.0,
+        "avg_planning_time_ms": 3.9485199995397124,
+        "avg_verification_time_ms": 0.1534000002720859,
+        "avg_repair_time_ms": 3.9485199995397124,
+        "avg_nodes_expanded": 4.6,
+        "avg_plan_cost": 2.4,
+        "fault_attribution_accuracy": 1.0,
+        "recovery_advantage_over_regeneration": 0.0
+      },
+      "B2_VerifierNoRepair": {
+        "experiment_id": "B2_VerifierNoRepair",
+        "total_instances": 5,
+        "valid_plan_rate": 0.0,
+        "goal_success_rate": 0.0,
+        "constraint_violation_rate": 1.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 0.0,
+        "avg_planning_time_ms": 0.1903399999719113,
+        "avg_verification_time_ms": 0.03522000042721629,
+        "avg_repair_time_ms": 0.1903399999719113,
+        "avg_nodes_expanded": 0.0,
+        "avg_plan_cost": 0.0,
+        "fault_attribution_accuracy": 1.0,
+        "recovery_advantage_over_regeneration": 0.0
+      },
+      "B3_GenericRegeneration": {
+        "experiment_id": "B3_GenericRegeneration",
+        "total_instances": 5,
+        "valid_plan_rate": 1.0,
+        "goal_success_rate": 1.0,
+        "constraint_violation_rate": 0.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 1.0,
+        "avg_planning_time_ms": 4.4582200003787875,
+        "avg_verification_time_ms": 0.12093999976059422,
+        "avg_repair_time_ms": 4.4582200003787875,
+        "avg_nodes_expanded": 4.6,
+        "avg_plan_cost": 2.4,
+        "fault_attribution_accuracy": 1.0,
+        "recovery_advantage_over_regeneration": 0.0
+      },
+      "OURS_CounterexampleRepair": {
+        "experiment_id": "OURS_CounterexampleRepair",
+        "total_instances": 5,
+        "valid_plan_rate": 1.0,
+        "goal_success_rate": 1.0,
+        "constraint_violation_rate": 0.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 1.0,
+        "avg_planning_time_ms": 3.4534999991592485,
+        "avg_verification_time_ms": 0.12841999996453524,
+        "avg_repair_time_ms": 3.4534999991592485,
+        "avg_nodes_expanded": 4.6,
+        "avg_plan_cost": 2.4,
+        "fault_attribution_accuracy": 1.0,
+        "recovery_advantage_over_regeneration": 0.0
+      }
+    }
+  },
+  "ablation_results": {
+    "experiment": "Component Ablation Study",
+    "num_instances": 5,
+    "seed": 42,
+    "ablation_runs": {
+      "full": {
+        "summary": {
+          "experiment_id": "Ablation_full",
+          "total_instances": 5,
+          "valid_plan_rate": 1.0,
+          "goal_success_rate": 1.0,
+          "constraint_violation_rate": 0.0,
+          "repair_success_rate": 1.0,
+          "avg_repair_iterations": 1.0,
+          "avg_planning_time_ms": 2.634339999349322,
+          "avg_verification_time_ms": 0.10099999853991903,
+          "avg_repair_time_ms": 2.634339999349322,
+          "avg_nodes_expanded": 4.6,
+          "avg_plan_cost": 2.4,
+          "fault_attribution_accuracy": 1.0,
+          "recovery_advantage_over_regeneration": 0.0
+        }
+      },
+      "without_verifier": {
+        "summary": {
+          "experiment_id": "Ablation_without_verifier",
+          "total_instances": 5,
+          "valid_plan_rate": 1.0,
+          "goal_success_rate": 1.0,
+          "constraint_violation_rate": 0.0,
+          "repair_success_rate": 1.0,
+          "avg_repair_iterations": 0.0,
+          "avg_planning_time_ms": 0.0,
+          "avg_verification_time_ms": 0.0,
+          "avg_repair_time_ms": 0.0,
+          "avg_nodes_expanded": 0.0,
+          "avg_plan_cost": 0.0,
+          "fault_attribution_accuracy": 1.0,
+          "recovery_advantage_over_regeneration": 0.0
+        }
+      },
+      "without_repair": {
+        "summary": {
+          "experiment_id": "Ablation_without_repair",
+          "total_instances": 5,
+          "valid_plan_rate": 0.0,
+          "goal_success_rate": 0.0,
+          "constraint_violation_rate": 1.0,
+          "repair_success_rate": 1.0,
+          "avg_repair_iterations": 0.0,
+          "avg_planning_time_ms": 0.0,
+          "avg_verification_time_ms": 0.02001999891945161,
+          "avg_repair_time_ms": 0.0,
+          "avg_nodes_expanded": 0.0,
+          "avg_plan_cost": 0.0,
+          "fault_attribution_accuracy": 1.0,
+          "recovery_advantage_over_regeneration": 0.0
+        }
+      }
+    }
+  }
+}
