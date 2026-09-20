@@ -186,3 +186,47 @@ def test_task_proposal_schema_conversion():
     assert len(contract.initial_facts) == 1
     assert len(contract.goal_facts) == 1
 
+
+def test_mock_llm_provider_4block_tower():
+    domain = create_blocks_world_domain()
+    provider = MockLLMProvider()
+    prompt = "Build a 4-block tower: yellow box on green box, green box on blue box, and blue box on red box."
+    proposal = provider.interpret(prompt, domain)
+    assert len(proposal.entities) == 4
+    assert len(proposal.goal_facts) == 3
+
+
+def test_mock_llm_provider_tower_inversion():
+    domain = create_blocks_world_domain()
+    provider = MockLLMProvider()
+    prompt = "The red box is on the green box. Unstack the red box, place it on the table, and stack the green box on the red box."
+    proposal = provider.interpret(prompt, domain)
+    assert "red_box" in proposal.entities
+    assert "green_box" in proposal.entities
+    assert any(f.predicate == "on" and f.arguments == ("red_box", "green_box") for f in proposal.initial_facts)
+
+
+def test_mock_llm_provider_obstacle_clearing():
+    domain = create_blocks_world_domain()
+    provider = MockLLMProvider()
+    prompt = "Clear the obstacle blocking the target position before placing the blue box on the green box."
+    proposal = provider.interpret(prompt, domain)
+    assert "obstacle" in proposal.entities
+    assert any(f.predicate == "on_table" and f.arguments == ("obstacle",) for f in proposal.goal_facts)
+
+
+def test_mock_llm_provider_deadlock():
+    domain = create_blocks_world_domain()
+    provider = MockLLMProvider()
+    prompt = "Put the red box on the green box and the green box on the red box simultaneously."
+    proposal = provider.interpret(prompt, domain)
+    assert len(proposal.goal_facts) == 2
+
+
+def test_live_llm_provider_ollama_fallback():
+    domain = create_blocks_world_domain()
+    provider = LiveLLMProvider(provider="ollama", endpoint="http://localhost:99999/v1")  # Unreachable port -> falls back gracefully
+    proposal = provider.interpret("stack b1 on b2", domain)
+    assert proposal.entities == {"b1": "block", "b2": "block"}
+
+

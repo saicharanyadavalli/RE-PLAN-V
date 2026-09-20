@@ -79,12 +79,21 @@ class PipelineOrchestrator:
         image: Optional[Image.Image] = None,
         algorithm: str = "A*",
         force_invalid_first_candidate: bool = False,
+        provider_type: str = "mock",
+        llm_model: Optional[str] = None,
     ) -> PipelineExecutionResult:
         """Executes the full pipeline from natural language prompt to verified final plan."""
         start_time = time.perf_counter()
 
         # Step 1: Neural Interpretation
-        proposal = self.llm_provider.interpret(prompt, self.domain)
+        if provider_type and provider_type != "mock":
+            from interpretation.llm.live import LiveLLMProvider
+            active_provider: BaseLLMProvider = LiveLLMProvider(provider=provider_type, model=llm_model)
+        else:
+            active_provider = self.llm_provider
+
+        proposal = active_provider.interpret(prompt, self.domain)
+
 
         # Optional Vision perception integration if image is provided
         if image is not None:

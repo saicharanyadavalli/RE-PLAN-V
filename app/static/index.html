@@ -487,10 +487,25 @@
               <label for="task-prompt">Natural Language Instruction</label>
               <textarea id="task-prompt" placeholder="e.g. Move the red box next to the blue box. Do not move the glass.">Move the red box next to the blue box. Do not move the glass.</textarea>
               <div class="preset-chips">
-                <div class="chip" onclick="setPreset(1)">Preset 1: Safe Relocation (DoD)</div>
-                <div class="chip" onclick="setPreset(2)">Preset 2: Multi-tier Stacking</div>
-                <div class="chip" onclick="setPreset(3)">Preset 3: Navigation Avoidance</div>
+                <div class="chip" onclick="setPreset(1)">Preset 1: Safe Relocation (DoD Canonical)</div>
+                <div class="chip" onclick="setPreset(2)">Preset 2: Multi-tier 3-Block Stacking</div>
+                <div class="chip" onclick="setPreset(3)">Preset 3: Tower Inversion (Deconstruct & Rebuild)</div>
+                <div class="chip" onclick="setPreset(4)">Preset 4: Complex 4-Block Assembly</div>
+                <div class="chip" onclick="setPreset(5)">Preset 5: Clear Obstacle Before Stacking</div>
+                <div class="chip" onclick="setPreset(6)">Preset 6: Fragile Object Safety Violation</div>
+                <div class="chip" onclick="setPreset(7)">Preset 7: Single-Arm Invariant & Mutex</div>
+                <div class="chip" onclick="setPreset(8)">Preset 8: Unsolvable Deadlock Detection</div>
               </div>
+            </div>
+
+            <div class="form-group">
+              <label for="llm-provider-select">Neural Interpretation Engine (Untrusted Proposer)</label>
+              <select id="llm-provider-select" onchange="updateLLMBadge()">
+                <option value="mock" selected>Deterministic Zero-API (Offline Rule-Based)</option>
+                <option value="ollama">Local 2B Model (Ollama: gemma2:2b / qwen2.5:1.5b)</option>
+                <option value="gemini">Google Gemini API (via GEMINI_API_KEY)</option>
+                <option value="openai">OpenAI / LM Studio Local (via OPENAI_API_KEY / Local Endpoint)</option>
+              </select>
             </div>
 
             <div class="form-group">
@@ -501,6 +516,7 @@
                 <option value="BEST_FIRST">Greedy Best-First Search</option>
               </select>
             </div>
+
 
             <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
               <input type="checkbox" id="force-fault-toggle" style="width: auto;">
@@ -755,18 +771,63 @@
       }
     }
 
+    function updateLLMBadge() {
+      const select = document.getElementById('llm-provider-select');
+      const badge = document.getElementById('mode-badge');
+      if (select.value === 'ollama') {
+        badge.innerText = 'Local 2B Model (Ollama: gemma2:2b)';
+        badge.style.background = 'rgba(56, 189, 248, 0.15)';
+        badge.style.color = 'var(--accent-blue)';
+      } else if (select.value === 'gemini') {
+        badge.innerText = 'Google Gemini 1.5 Flash';
+        badge.style.background = 'rgba(168, 85, 247, 0.15)';
+        badge.style.color = '#c084fc';
+      } else if (select.value === 'openai') {
+        badge.innerText = 'OpenAI / Local LM Studio';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = 'var(--accent-green)';
+      } else {
+        badge.innerText = 'Deterministic Mock Mode';
+        badge.style.background = 'rgba(255, 255, 255, 0.05)';
+        badge.style.color = 'var(--text-secondary)';
+      }
+    }
+
     function setPreset(num) {
       const promptEl = document.getElementById('task-prompt');
       const faultToggle = document.getElementById('force-fault-toggle');
       if (num === 1) {
         promptEl.value = "Move the red box next to the blue box. Do not move the glass.";
         faultToggle.checked = false;
+        drawTabletop(["red_box", "blue_box", "glass"]);
       } else if (num === 2) {
         promptEl.value = "Stack the red box on the green box, then put the blue box on the red box.";
         faultToggle.checked = false;
+        drawTabletop(["red_box", "blue_box", "green_box"]);
       } else if (num === 3) {
-        promptEl.value = "Navigate to location (3, 3) avoiding obstacle zones.";
+        promptEl.value = "The red box is on the green box. Unstack the red box, place it on the table, and stack the green box on the red box.";
         faultToggle.checked = false;
+        drawTabletop(["red_box", "green_box"]);
+      } else if (num === 4) {
+        promptEl.value = "Build a 4-block tower: yellow box on green box, green box on blue box, and blue box on red box.";
+        faultToggle.checked = false;
+        drawTabletop(["yellow_box", "green_box", "blue_box", "red_box"]);
+      } else if (num === 5) {
+        promptEl.value = "Clear the obstacle blocking the target position before placing the blue box on the green box.";
+        faultToggle.checked = false;
+        drawTabletop(["obstacle", "blue_box", "green_box"]);
+      } else if (num === 6) {
+        promptEl.value = "Stack the blue box on the green box. Do not touch the fragile glass.";
+        faultToggle.checked = true; // Injects fault to showcase counterexample witness on safety constraint
+        drawTabletop(["blue_box", "green_box", "glass"]);
+      } else if (num === 7) {
+        promptEl.value = "Pick up the red box while keeping workspace clear and respecting single-arm capacity.";
+        faultToggle.checked = false;
+        drawTabletop(["red_box"]);
+      } else if (num === 8) {
+        promptEl.value = "Put the red box on the green box and the green box on the red box simultaneously.";
+        faultToggle.checked = false;
+        drawTabletop(["red_box", "green_box"]);
       }
     }
 
@@ -797,18 +858,22 @@
         "red_box": "#ef4444",
         "blue_box": "#3b82f6",
         "green_box": "#10b981",
+        "yellow_box": "#eab308",
+        "obstacle": "#f97316",
         "glass": "#a855f7"
       };
 
       const xPositions = {
-        "red_box": 60,
-        "blue_box": 150,
-        "green_box": 240,
-        "glass": 320
+        "red_box": 50,
+        "blue_box": 120,
+        "green_box": 190,
+        "yellow_box": 260,
+        "obstacle": 260,
+        "glass": 330
       };
 
-      entities.forEach(name => {
-        const x = xPositions[name] || 100;
+      entities.forEach((name, idx) => {
+        const x = xPositions[name] || (50 + idx * 70);
         const y = h - 75;
         const color = colorMap[name] || "#e2e8f0";
 
@@ -846,6 +911,7 @@
     async function executePipeline() {
       const prompt = document.getElementById('task-prompt').value;
       const algorithm = document.getElementById('algorithm-select').value;
+      const providerType = document.getElementById('llm-provider-select').value;
       const forceFault = document.getElementById('force-fault-toggle').checked;
       const timeline = document.getElementById('pipeline-timeline');
       const latencyEl = document.getElementById('pipeline-latency');
@@ -862,11 +928,14 @@
           body: JSON.stringify({
             prompt: prompt,
             algorithm: algorithm,
-            force_invalid_first_candidate: forceFault
+            force_invalid_first_candidate: forceFault,
+            provider_type: providerType,
+            llm_model: providerType === 'ollama' ? 'gemma2:2b' : (providerType === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini')
           })
         });
 
         if (!resp.ok) {
+
           throw new Error('Pipeline error: ' + (await resp.text()));
         }
 

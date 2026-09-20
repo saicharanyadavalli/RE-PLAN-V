@@ -18,6 +18,8 @@ class PipelineRequest(BaseModel):
     prompt: str = "Move the red box next to the blue box. Do not move the glass."
     algorithm: str = "A*"
     force_invalid_first_candidate: bool = False
+    provider_type: str = "mock"  # "mock", "ollama", "gemini", "openai"
+    llm_model: Optional[str] = "gemma2:2b"
 
 
 class BenchmarkRequest(BaseModel):
@@ -32,10 +34,13 @@ def run_pipeline(req: PipelineRequest) -> PipelineExecutionResult:
             prompt=req.prompt,
             algorithm=req.algorithm,
             force_invalid_first_candidate=req.force_invalid_first_candidate,
+            provider_type=req.provider_type,
+            llm_model=req.llm_model,
         )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/benchmark/run")
