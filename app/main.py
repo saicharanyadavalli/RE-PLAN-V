@@ -42,6 +42,10 @@ def create_app():
     # Mount API routes
     app.include_router(api_router)
 
+    from app.api.websocket import router as ws_router
+    app.include_router(ws_router)
+
+
     # Static assets and index.html
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
