@@ -3,13 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
+from typing import Optional
+
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+except Exception:
+    pass
+
+# Ensure loopback is never proxied
+current_no_proxy = os.environ.get("NO_PROXY", "")
+if "127.0.0.1" not in current_no_proxy:
+    os.environ["NO_PROXY"] = f"{current_no_proxy},127.0.0.1,localhost".strip(",")
+    os.environ["no_proxy"] = os.environ["NO_PROXY"]
 
 
 @dataclass
 class AppConfig:
     host: str = "127.0.0.1"
-    port: int = 8000
+    port: int = 8080
     debug: bool = False
     title: str = "RE-PLAN-V: Research & Demo Platform"
     static_dir: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent / "app" / "static")
@@ -52,7 +68,12 @@ class VisionConfig:
 
 @dataclass
 class LLMConfig:
-    provider: str = "mock"  # "mock", "gemini"
+    provider: str = field(default_factory=lambda: os.environ.get("LOCAL_LLM_PROVIDER", "mock"))
+    lm_studio_url: str = field(default_factory=lambda: os.environ.get("LM_STUDIO_URL", "http://127.0.0.1:1234"))
+    gemini_api_key: Optional[str] = field(default_factory=lambda: os.environ.get("GEMINI_API_KEY"))
+    gemini_model: str = field(default_factory=lambda: os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"))
+    openai_api_key: Optional[str] = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY"))
+    openai_model: str = field(default_factory=lambda: os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
     temperature: float = 0.0
     timeout_seconds: float = 10.0
 

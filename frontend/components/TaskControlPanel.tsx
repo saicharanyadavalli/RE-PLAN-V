@@ -7,6 +7,7 @@ import { PipelineRunRequest } from "../types/pipeline";
 interface TaskControlPanelProps {
   onRun: (req: PipelineRunRequest) => void;
   isStreaming: boolean;
+  onPromptChange?: (prompt: string) => void;
 }
 
 const PRESETS = [
@@ -68,7 +69,7 @@ const PRESETS = [
   },
 ];
 
-export function TaskControlPanel({ onRun, isStreaming }: TaskControlPanelProps) {
+export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskControlPanelProps) {
   const [prompt, setPrompt] = useState(PRESETS[0].prompt);
   const [algorithm, setAlgorithm] = useState("A*");
   const [forceFault, setForceFault] = useState(false);
@@ -78,6 +79,7 @@ export function TaskControlPanel({ onRun, isStreaming }: TaskControlPanelProps) 
   const handleSelectPreset = (p: (typeof PRESETS)[0]) => {
     setPrompt(p.prompt);
     setForceFault(p.forceFault);
+    onPromptChange?.(p.prompt);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,8 +105,12 @@ export function TaskControlPanel({ onRun, isStreaming }: TaskControlPanelProps) 
         <span className="rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-0.5 font-mono text-[10px] text-cyan-300">
           {providerType === "mock"
             ? "Offline Rule-Based Mock"
+            : providerType === "lmstudio"
+            ? "LM Studio (127.0.0.1:1234)"
             : providerType === "ollama"
             ? "Local 2B Model (Ollama)"
+            : providerType === "gemini"
+            ? "Google Gemini 1.5 Flash"
             : "Cloud API"}
         </span>
       </div>
@@ -117,7 +123,10 @@ export function TaskControlPanel({ onRun, isStreaming }: TaskControlPanelProps) 
           </label>
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              onPromptChange?.(e.target.value);
+            }}
             rows={2}
             className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             placeholder="Type your robotic instruction..."
@@ -160,9 +169,10 @@ export function TaskControlPanel({ onRun, isStreaming }: TaskControlPanelProps) 
               className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
             >
               <option value="mock">Deterministic Zero-API (Offline)</option>
+              <option value="lmstudio">LM Studio Local Model (http://127.0.0.1:1234)</option>
               <option value="ollama">Local 2B Model (Ollama: gemma2:2b / qwen2.5)</option>
               <option value="gemini">Google Gemini 1.5 Flash (via API Key)</option>
-              <option value="openai">OpenAI / LM Studio Local Endpoint</option>
+              <option value="openai">OpenAI Endpoint (gpt-4o-mini)</option>
             </select>
           </div>
 

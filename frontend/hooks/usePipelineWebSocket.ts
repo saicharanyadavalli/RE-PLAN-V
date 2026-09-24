@@ -27,6 +27,15 @@ export interface PipelineAccumulatedState {
   finalPlan: GroundActionSchema[];
   isFinalVerified: boolean | null;
   executionTimeMs: number;
+  interpretationTimeMs?: number;
+  searchTimeMs?: number;
+  verificationTimeMs?: number;
+  decisionTrace?: any;
+  plannerAlgorithm?: string;
+  providerUsed?: string;
+  cascadeCount?: number;
+  backtrackCount?: number;
+  treeLog?: Array<{ stage: string; message: string; timestamp: number; type: "info" | "warning" | "recovery" }>;
 }
 
 const initialState: PipelineAccumulatedState = {
@@ -42,9 +51,14 @@ const initialState: PipelineAccumulatedState = {
   finalPlan: [],
   isFinalVerified: null,
   executionTimeMs: 0,
+  plannerAlgorithm: "A*",
+  providerUsed: "auto",
+  cascadeCount: 0,
+  backtrackCount: 0,
+  treeLog: [],
 };
 
-export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000") {
+export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080") {
   const [isStreaming, setIsStreaming] = useState(false);
   const [events, setEvents] = useState<PipelineStreamEvent[]>([]);
   const [state, setState] = useState<PipelineAccumulatedState>(initialState);
@@ -65,9 +79,9 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000
       setState((prev) => ({ ...prev, prompt: req.prompt }));
 
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      // Derive host from window or fallback to default backend
       const host = window.location.hostname || "127.0.0.1";
-      const wsUrl = `${wsProtocol}//${host}:8000/ws/pipeline`;
+      const wsUrl = `${wsProtocol}//${host}:8080/ws/pipeline`;
+
 
       try {
         const ws = new WebSocket(wsUrl);
@@ -83,7 +97,35 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000
             setEvents((prev) => [...prev, data]);
 
             // Update accumulated state stage by stage
-            if (data.stage === "INTERPRETATION_COMPLETED") {
+            if (data.stage === "BACKTRACK") {
+              setState((prev) => ({
+                ...prev,
+                backtrackCount: (prev.backtrackCount || 0) + 1,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "BACKTRACK", message: data.message, timestamp: data.timestamp || Date.now(), type: "recovery" },
+                ],
+              }));
+            } else if (data.stage === "PLANNER_CASCADE") {
+              setState((prev) => ({
+                ...prev,
+                plannerAlgorithm: data.data.algorithm || prev.plannerAlgorithm,
+                cascadeCount: (prev.cascadeCount || 0) + 1,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "CASCADE", message: data.message, timestamp: data.timestamp || Date.now(), type: "recovery" },
+                ],
+              }));
+            } else if (data.stage === "VALIDATION_FAILED") {
+              setState((prev) => ({
+                ...prev,
+                isSchemaValid: false,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "VALIDATION_FAILED", message: data.message, timestamp: data.timestamp || Date.now(), type: "warning" },
+                ],
+              }));
+            } else if (data.stage === "INTERPRETATION_COMPLETED") {
               setState((prev) => ({
                 ...prev,
                 entities: data.data.entities || {},
@@ -91,23 +133,29 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000
                 initialFacts: data.data.initial_facts || [],
                 negativeConstraints: data.data.negative_constraints || [],
                 isSchemaValid: data.data.is_valid,
+                interpretationTimeMs: data.data.stage_duration_ms,
+                providerUsed: data.data.provider_used || prev.providerUsed,
               }));
             } else if (data.stage === "SEARCH_COMPLETED") {
               setState((prev) => ({
                 ...prev,
                 candidatePlan: data.data.actions || [],
                 candidateCost: data.data.cost || 0,
+                searchTimeMs: data.data.stage_duration_ms,
+                plannerAlgorithm: data.data.algorithm || prev.plannerAlgorithm,
               }));
             } else if (data.stage === "VERIFICATION_RESULT") {
               setState((prev) => ({
                 ...prev,
                 initialVerificationPassed: data.data.is_valid,
+                verificationTimeMs: data.data.stage_duration_ms,
               }));
             } else if (data.stage === "VERIFICATION_FAILED") {
               setState((prev) => ({
                 ...prev,
                 initialVerificationPassed: false,
                 verificationFailureMessage: data.data.explanation,
+                verificationTimeMs: data.data.stage_duration_ms,
               }));
             } else if (data.stage === "COUNTEREXAMPLE_EXTRACTED") {
               setState((prev) => ({
@@ -127,6 +175,7 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000
               setState((prev) => ({
                 ...prev,
                 repairsApplied: data.data.repairs_applied || [],
+                repairTimeMs: data.data.stage_duration_ms,
               }));
             } else if (data.stage === "FINAL_VERIFICATION") {
               setState((prev) => ({
@@ -134,6 +183,7 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8000
                 finalPlan: data.data.final_plan || [],
                 isFinalVerified: data.data.is_valid,
                 executionTimeMs: data.data.execution_time_ms || 0,
+                decisionTrace: data.data.decision_trace || prev.decisionTrace,
               }));
             } else if (data.stage === "PIPELINE_FINISHED" || data.stage === "ERROR") {
               setIsStreaming(false);

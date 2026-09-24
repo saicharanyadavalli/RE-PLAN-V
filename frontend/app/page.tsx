@@ -13,6 +13,9 @@ import { usePipelineWebSocket } from "../hooks/usePipelineWebSocket";
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"demo" | "benchmark" | "architecture">("demo");
   const [isDefenseModalOpen, setIsDefenseModalOpen] = useState(false);
+  const [currentPrompt, setCurrentPrompt] = useState(
+    "Move the red box next to the blue box. Do not move the glass."
+  );
 
   const { isStreaming, events, state, error, runPipeline, reset } = usePipelineWebSocket();
 
@@ -39,12 +42,17 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Left Column: Input Panel & Simulation Canvas */}
             <div className="flex flex-col gap-6 lg:col-span-5">
-              <TaskControlPanel onRun={runPipeline} isStreaming={isStreaming} />
+              <TaskControlPanel
+                onRun={runPipeline}
+                isStreaming={isStreaming}
+                onPromptChange={setCurrentPrompt}
+              />
               <TabletopCanvas
                 entities={state.entities}
                 initialFacts={state.initialFacts}
                 finalPlan={state.finalPlan}
                 isStreaming={isStreaming}
+                prompt={currentPrompt}
               />
             </div>
 

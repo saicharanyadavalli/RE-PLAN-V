@@ -12,7 +12,8 @@ export function BenchmarkTab() {
   const runBenchmark = async () => {
     setIsRunning(true);
     try {
-      const resp = await fetch("http://127.0.0.1:8000/api/benchmark/run", {
+      const host = window.location.hostname || "127.0.0.1";
+      const resp = await fetch(`http://${host}:8080/api/benchmark/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ num_instances: instances, seed: seed }),

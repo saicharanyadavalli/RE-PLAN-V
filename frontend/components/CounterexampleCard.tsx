@@ -10,6 +10,13 @@ interface CounterexampleCardProps {
 }
 
 export function CounterexampleCard({ witness, attribution }: CounterexampleCardProps) {
+  const action = witness.offending_action || witness.failed_action;
+  const stepIdx = witness.action_index ?? witness.step_index ?? 0;
+  const conditionStr =
+    typeof witness.violated_condition === "object" && witness.violated_condition !== null
+      ? `${(witness.violated_condition as any).predicate}(${((witness.violated_condition as any).arguments || []).join(", ")})`
+      : String(witness.violated_condition || "Precondition / Invariant Unmet");
+
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-rose-500/30 bg-rose-950/20 p-4 shadow-xl">
       <div className="flex items-center justify-between border-b border-rose-500/20 pb-2">
@@ -20,26 +27,30 @@ export function CounterexampleCard({ witness, attribution }: CounterexampleCardP
           </h4>
         </div>
         <span className="rounded bg-rose-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-rose-300">
-          STEP {witness.step_index} FAILED
+          STEP {stepIdx} FAILED
         </span>
       </div>
 
       <div className="flex flex-col gap-1.5 text-xs">
+        {action && (
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Offending Action:</span>
+            <code className="rounded bg-rose-900/40 px-2 py-0.5 font-mono text-rose-200">
+              {action.name}({(action.arguments || []).join(", ")})
+            </code>
+          </div>
+        )}
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">Failed Action:</span>
-          <code className="rounded bg-rose-900/40 px-2 py-0.5 font-mono text-rose-200">
-            {witness.failed_action.name}({witness.failed_action.arguments.join(", ")})
-          </code>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400">Violated Precondition:</span>
+          <span className="text-slate-400">Violated Condition:</span>
           <code className="rounded bg-rose-900/60 px-2 py-0.5 font-mono font-semibold text-rose-300">
-            {witness.violated_condition}
+            {conditionStr}
           </code>
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
-          {witness.explanation}
-        </p>
+        {witness.explanation && (
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-300">
+            {witness.explanation}
+          </p>
+        )}
       </div>
 
       {attribution && (

@@ -70,6 +70,15 @@ def test_ablation_study_runner():
     res_no_repair = runner.run_ablation("without_repair", inst, domain)
     assert res_no_repair["ablation"] == "without_repair"
 
+    res_no_cex = runner.run_ablation("without_counterexample", inst, domain)
+    assert res_no_cex["ablation"] == "without_counterexample"
+
+    res_no_attr = runner.run_ablation("without_attribution", inst, domain)
+    assert res_no_attr["ablation"] == "without_attribution"
+
+    res_gen_regen = runner.run_ablation("generic_regeneration", inst, domain)
+    assert res_gen_regen["ablation"] == "generic_regeneration"
+
 
 def test_experiment_runner_primary_research_question(tmp_path):
     runner = ExperimentRunner(output_dir=tmp_path)

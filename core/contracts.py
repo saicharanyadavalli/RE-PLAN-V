@@ -314,3 +314,41 @@ class EvaluationMetricsSchema(BaseModel):
     avg_plan_cost: float = 0.0
     fault_attribution_accuracy: float = 0.0
     recovery_advantage_over_regeneration: float = 0.0
+
+
+# ==============================================================================
+# 10. Pipeline Decision Tree Contracts
+# ==============================================================================
+
+class PipelineStageStatus(str, Enum):
+    """Status of an individual pipeline stage attempt."""
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+    RETRYING = "RETRYING"
+    BACKTRACKING = "BACKTRACKING"
+
+
+class StageAttemptRecord(BaseModel):
+    """Records a single attempt at a pipeline stage."""
+    stage: str = Field(description="Stage name: INTERPRET, VALIDATE, PLAN, VERIFY, REPAIR")
+    attempt: int = Field(default=1, description="Attempt number (1-indexed)")
+    status: PipelineStageStatus
+    provider_used: Optional[str] = Field(default=None, description="LLM provider or planner algorithm used")
+    duration_ms: float = 0.0
+    error: Optional[str] = None
+    recovery_action: Optional[str] = Field(default=None, description="What recovery was taken: retry_with_feedback, model_cascade, planner_cascade, backtrack")
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PipelineDecisionTrace(BaseModel):
+    """Complete decision tree trace showing all attempts, retries, cascades, and backtracks."""
+    total_attempts: int = 0
+    interpretation_attempts: int = 0
+    validation_retries: int = 0
+    planner_cascades: int = 0
+    backtracks: int = 0
+    final_provider: Optional[str] = None
+    final_algorithm: Optional[str] = None
+    stage_trace: List[StageAttemptRecord] = Field(default_factory=list)
+    recovery_path: List[str] = Field(default_factory=list, description="Ordered list of recovery actions taken")

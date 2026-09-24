@@ -1,7 +1,17 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, XCircle, Clock, ShieldCheck, Sparkles, AlertTriangle } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ShieldCheck,
+  Sparkles,
+  AlertTriangle,
+  GitBranch,
+  RefreshCw,
+  Layers,
+} from "lucide-react";
 import { PipelineAccumulatedState } from "../hooks/usePipelineWebSocket";
 import { CounterexampleCard } from "./CounterexampleCard";
 import { RepairCard } from "./RepairCard";
@@ -27,8 +37,14 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
     );
   }
 
+  const backtracks = state.backtrackCount || (state.decisionTrace?.backtracks ?? 0);
+  const cascades = state.cascadeCount || (state.decisionTrace?.planner_cascades ?? 0);
+  const provider = state.providerUsed || state.decisionTrace?.final_provider || "Auto Cascade";
+  const algorithm = state.plannerAlgorithm || state.decisionTrace?.final_algorithm || "A*";
+
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-xl backdrop-blur-sm">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-cyan-400" />
@@ -36,10 +52,79 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
             Live Execution Trace
           </h3>
         </div>
-        <span className="font-mono text-xs font-bold text-emerald-400">
-          {state.executionTimeMs > 0 ? `${state.executionTimeMs.toFixed(1)} ms` : "Streaming..."}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold text-emerald-400">
+            {state.executionTimeMs > 0 ? `${state.executionTimeMs.toFixed(1)} ms` : "Streaming..."}
+          </span>
+        </div>
       </div>
+
+      {/* Decision Tree Architecture Badge Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-2.5 px-3 text-xs">
+        <div className="flex items-center gap-2">
+          <GitBranch className="h-4 w-4 text-indigo-400" />
+          <span className="font-mono text-[11px] font-semibold text-indigo-300">
+            DECISION TREE: RETRY & CASCADE
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px]">
+          <span className="rounded bg-indigo-900/60 px-2 py-0.5 text-indigo-200 border border-indigo-500/30">
+            Provider: {provider}
+          </span>
+          <span className="rounded bg-indigo-900/60 px-2 py-0.5 text-indigo-200 border border-indigo-500/30">
+            Planner: {algorithm}
+          </span>
+          {backtracks > 0 ? (
+            <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-300 border border-amber-500/40">
+              {backtracks} Backtrack{backtracks > 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="rounded bg-slate-800/80 px-2 py-0.5 text-slate-400">
+              0 Backtracks
+            </span>
+          )}
+          {cascades > 0 ? (
+            <span className="rounded bg-purple-500/20 px-2 py-0.5 text-purple-300 border border-purple-500/40">
+              {cascades} Cascade{cascades > 1 ? "s" : ""}
+            </span>
+          ) : (
+            <span className="rounded bg-slate-800/80 px-2 py-0.5 text-slate-400">
+              0 Cascades
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Live Tree Recovery Events (if any occurred) */}
+      {state.treeLog && state.treeLog.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs">
+          <div className="flex items-center gap-2 text-amber-300 font-mono text-[11px] font-semibold">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-amber-400" />
+            Decision Tree Fallback & Recovery Events
+          </div>
+          <div className="flex flex-col gap-1 mt-1">
+            {state.treeLog.map((log, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2 rounded bg-slate-900/80 px-2 py-1 font-mono text-[10px] text-slate-300"
+              >
+                <span
+                  className={`font-bold ${
+                    log.type === "recovery"
+                      ? "text-amber-400"
+                      : log.type === "warning"
+                      ? "text-rose-400"
+                      : "text-cyan-400"
+                  }`}
+                >
+                  [{log.stage}]
+                </span>
+                <span>{log.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {/* Step 1: Neural Interpretation */}
@@ -55,8 +140,17 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
           </div>
           <div className="flex-1 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-200">1. Neural Interpretation & Validation</span>
-              <span className="font-mono text-[10px] text-slate-400">Untrusted Proposer</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">1. Neural Interpretation & Validation</span>
+                {state.interpretationTimeMs !== undefined && (
+                  <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+                    ⚡ {state.interpretationTimeMs.toFixed(1)} ms
+                  </span>
+                )}
+              </div>
+              <span className="font-mono text-[10px] text-slate-400">
+                {provider}
+              </span>
             </div>
             {Object.keys(state.entities).length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
@@ -84,7 +178,16 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
           </div>
           <div className="flex-1 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-200">2. Candidate Plan Generation (A*)</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">
+                  2. Candidate Plan Search ({algorithm})
+                </span>
+                {state.searchTimeMs !== undefined && (
+                  <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+                    ⚡ {state.searchTimeMs.toFixed(1)} ms
+                  </span>
+                )}
+              </div>
               <span className="font-mono text-[10px] text-slate-400">
                 {state.candidatePlan.length} Actions (Cost: {state.candidateCost})
               </span>
@@ -96,7 +199,7 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
                     key={i}
                     className="rounded bg-slate-800/80 px-2 py-0.5 font-mono text-[11px] text-slate-300"
                   >
-                    {i + 1}. {act.name}({act.arguments.join(", ")})
+                    {i + 1}. {act.name}({(act.arguments || []).join(", ")})
                   </span>
                 ))}
               </div>
@@ -117,7 +220,14 @@ export function ExecutionStepper({ state, isStreaming }: ExecutionStepperProps) 
           </div>
           <div className="flex-1 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-200">3. Formal State Transition Verification</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-200">3. Formal State Transition Verification</span>
+                {state.verificationTimeMs !== undefined && (
+                  <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 font-mono text-[10px] text-cyan-300">
+                    ⚡ {state.verificationTimeMs.toFixed(1)} ms
+                  </span>
+                )}
+              </div>
               <span
                 className={`font-mono text-[10px] font-bold ${
                   state.initialVerificationPassed

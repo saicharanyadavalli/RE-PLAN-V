@@ -70,14 +70,17 @@ export function Navbar({ activeTab, setActiveTab, isStreaming, onOpenDefenseModa
 
         {/* Live Status & Defense Cheat-Sheet */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs">
+          <div
+            title="Authoritative STRIPS verifier, forward chaining, and CEGIS repair engine active"
+            className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs"
+          >
             <span
               className={`h-2 w-2 rounded-full ${
                 isStreaming ? "animate-ping bg-cyan-400" : "bg-emerald-400"
               }`}
             />
             <span className="font-mono text-[11px] text-slate-300">
-              {isStreaming ? "WEBSOCKET STREAMING" : "CORE READY (OFFLINE)"}
+              {isStreaming ? "PIPELINE STREAMING..." : "SYMBOLIC CORE: ACTIVE"}
             </span>
           </div>
 

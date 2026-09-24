@@ -32,7 +32,7 @@ export function RepairCard({ repairs, finalPlan }: RepairCardProps) {
               key={i}
               className="rounded-lg border border-cyan-500/20 bg-slate-950/60 p-2 font-mono text-[11px] text-cyan-200"
             >
-              <span className="font-bold text-amber-400">[{r.type}]</span> {r.description}
+              <span className="font-bold text-amber-400">[{r.repair_type || r.type || "CONSTRAINT"}]</span> {r.description}
             </div>
           ))}
         </div>
@@ -48,7 +48,7 @@ export function RepairCard({ repairs, finalPlan }: RepairCardProps) {
               className="flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-2.5 py-1 font-mono text-xs font-medium text-emerald-300"
             >
               <span className="text-[10px] text-slate-500">{i + 1}.</span>
-              {act.name}({act.arguments.join(", ")})
+              {act.name}({(act.arguments || []).join(", ")})
             </span>
           ))}
         </div>
