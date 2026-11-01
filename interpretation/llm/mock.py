@@ -401,6 +401,21 @@ class MockLLMProvider(BaseLLMProvider):
                 confidence=0.95,
             )
 
+        # Dynamic router formalization for general blocks world prompts before static fallback
+        from interpretation.router import DomainRouter, RoutingOutcome
+        router = DomainRouter()
+        routing = router.route(prompt, explicit_domain_id="blocks_world")
+        if routing.outcome == RoutingOutcome.SUPPORTED and routing.entities and routing.goal_facts:
+            return TaskProposalSchema(
+                task_id="mock_router_blocks_task",
+                raw_prompt=prompt,
+                entities=routing.entities,
+                initial_facts=routing.initial_facts,
+                goal_facts=routing.goal_facts,
+                negative_constraints=routing.negative_constraints,
+                confidence=routing.domain_confidence,
+            )
+
         # Default fallback proposal
         entities = {"b1": "block", "b2": "block"}
         initial_facts = [
