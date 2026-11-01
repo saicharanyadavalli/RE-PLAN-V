@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Play, BarChart3, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { getApiBaseUrl } from "../utils/api";
 
 export function BenchmarkTab() {
   const [instances, setInstances] = useState(5);
@@ -12,8 +13,7 @@ export function BenchmarkTab() {
   const runBenchmark = async () => {
     setIsRunning(true);
     try {
-      const host = window.location.hostname || "127.0.0.1";
-      const resp = await fetch(`http://${host}:8080/api/benchmark/run`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/benchmark/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ num_instances: instances, seed: seed }),

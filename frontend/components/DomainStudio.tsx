@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { DomainMetadata } from "../types/pipeline";
+import { getApiBaseUrl } from "../utils/api";
 
 interface DomainStudioProps {
   onSelectPrompt?: (prompt: string, domainId: string) => void;
@@ -15,8 +16,7 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
   useEffect(() => {
     async function fetchDomains() {
       try {
-        const host = window.location.hostname || "127.0.0.1";
-        const resp = await fetch(`http://${host}:8080/api/domains`);
+        const resp = await fetch(`${getApiBaseUrl()}/api/domains`);
         if (resp.ok) {
           const data = await resp.json();
           setDomains(data);

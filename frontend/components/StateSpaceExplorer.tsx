@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { GraphNode, GraphEdge, GraphStats, FactSchema } from "../types/pipeline";
+import { getApiBaseUrl } from "../utils/api";
 
 interface StateSpaceExplorerProps {
   streamedNodes?: GraphNode[];
@@ -60,8 +61,7 @@ export function StateSpaceExplorer({
     setIsLoading(true);
     setActiveSource("standalone");
     try {
-      const host = window.location.hostname || "127.0.0.1";
-      const resp = await fetch(`http://${host}:8080/api/graph/enumerate`, {
+      const resp = await fetch(`${getApiBaseUrl()}/api/graph/enumerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

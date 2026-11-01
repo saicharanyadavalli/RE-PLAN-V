@@ -12,6 +12,7 @@ import {
   GraphEdge,
   GraphStats,
 } from "../types/pipeline";
+import { getApiBaseUrl, getWebSocketUrl } from "../utils/api";
 
 export interface PipelineAccumulatedState {
   prompt: string;
@@ -94,10 +95,7 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080
       setIsStreaming(true);
       setState((prev) => ({ ...prev, prompt: req.prompt }));
 
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host = window.location.hostname || "127.0.0.1";
-      const wsUrl = `${wsProtocol}//${host}:8080/ws/pipeline`;
-
+      const wsUrl = getWebSocketUrl("/ws/pipeline");
 
       try {
         const ws = new WebSocket(wsUrl);
@@ -278,7 +276,7 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080
           console.warn("WebSocket error; falling back to REST endpoint /api/pipeline/run");
           // Fallback to REST API
           try {
-            const resp = await fetch(`${backendUrl}/api/pipeline/run`, {
+            const resp = await fetch(`${getApiBaseUrl()}/api/pipeline/run`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
