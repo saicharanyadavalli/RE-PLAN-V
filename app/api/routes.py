@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.services.pipeline import PipelineExecutionResult, PipelineOrchestrator
 from evaluation.experiments.runner import ExperimentRunner
@@ -26,7 +26,7 @@ class PipelineRequest(BaseModel):
 
 
 class BenchmarkRequest(BaseModel):
-    num_instances: int = 5
+    num_instances: int = Field(default=5, ge=1)
     seed: int = 42
 
 
@@ -119,9 +119,9 @@ def get_domain_details(domain_id: str) -> Dict[str, Any]:
 class GraphEnumerateRequest(BaseModel):
     domain_id: str = "blocks_world"
     prompt: Optional[str] = "Stack the red box on the blue box."
-    max_nodes: int = 300
-    max_edges: int = 1000
-    timeout_seconds: float = 5.0
+    max_nodes: int = Field(default=300, ge=1)
+    max_edges: int = Field(default=1000, ge=1)
+    timeout_seconds: float = Field(default=5.0, gt=0.0)
 
 
 @router.post("/graph/enumerate")

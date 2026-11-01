@@ -188,7 +188,9 @@ class TestStage8SecurityAndSanitization:
                 "timeout_seconds": -5.0,
             },
         )
-        assert resp.status_code in (200, 422)
+        assert resp.status_code == 422
+        data = resp.json()
+        assert "detail" in data
 
 
 class TestStage8ModelRelativeSafety:
