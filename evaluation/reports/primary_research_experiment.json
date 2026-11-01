@@ -10,15 +10,15 @@
       "valid_plan_rate": 0.0,
       "goal_success_rate": 0.0,
       "constraint_violation_rate": 1.0,
-      "repair_success_rate": 0.0,
+      "repair_success_rate": null,
       "avg_repair_iterations": 0.0,
-      "avg_planning_time_ms": 0.2724999994825339,
-      "avg_verification_time_ms": 0.053200000365905,
+      "avg_planning_time_ms": 0.234650000493275,
+      "avg_verification_time_ms": 0.04489999992074445,
       "avg_repair_time_ms": 0.0,
       "avg_nodes_expanded": 0.0,
       "avg_plan_cost": 0.0,
       "fault_attribution_accuracy": 0.0,
-      "recovery_advantage_over_regeneration": 0.0
+      "recovery_advantage_over_regeneration": null
     },
     "B1_FormalizedPlanner": {
       "experiment_id": "B1_FormalizedPlanner",
@@ -26,15 +26,15 @@
       "valid_plan_rate": 1.0,
       "goal_success_rate": 1.0,
       "constraint_violation_rate": 0.0,
-      "repair_success_rate": 1.0,
+      "repair_success_rate": null,
       "avg_repair_iterations": 0.0,
-      "avg_planning_time_ms": 2.6001500000347733,
-      "avg_verification_time_ms": 0.22280000121099874,
+      "avg_planning_time_ms": 2.622250000058557,
+      "avg_verification_time_ms": 0.1002000008156756,
       "avg_repair_time_ms": 0.0,
-      "avg_nodes_expanded": 4.0,
+      "avg_nodes_expanded": 5.0,
       "avg_plan_cost": 3.0,
       "fault_attribution_accuracy": 0.0,
-      "recovery_advantage_over_regeneration": 0.0
+      "recovery_advantage_over_regeneration": null
     },
     "B2_VerifierNoRepair": {
       "experiment_id": "B2_VerifierNoRepair",
@@ -44,13 +44,13 @@
       "constraint_violation_rate": 1.0,
       "repair_success_rate": 0.0,
       "avg_repair_iterations": 0.0,
-      "avg_planning_time_ms": 0.18945000101666665,
-      "avg_verification_time_ms": 0.034050000067509245,
+      "avg_planning_time_ms": 0.15070000154082663,
+      "avg_verification_time_ms": 0.022449999960372224,
       "avg_repair_time_ms": 0.0,
       "avg_nodes_expanded": 0.0,
       "avg_plan_cost": 0.0,
       "fault_attribution_accuracy": 0.0,
-      "recovery_advantage_over_regeneration": 0.0
+      "recovery_advantage_over_regeneration": null
     },
     "B3_GenericRegeneration": {
       "experiment_id": "B3_GenericRegeneration",
@@ -60,13 +60,13 @@
       "constraint_violation_rate": 0.0,
       "repair_success_rate": 1.0,
       "avg_repair_iterations": 1.0,
-      "avg_planning_time_ms": 4.209300000184157,
-      "avg_verification_time_ms": 0.29989999984536553,
-      "avg_repair_time_ms": 4.209300000184157,
+      "avg_planning_time_ms": 2.766699999483535,
+      "avg_verification_time_ms": 0.14589999955205712,
+      "avg_repair_time_ms": 2.766699999483535,
       "avg_nodes_expanded": 0.0,
       "avg_plan_cost": 4.0,
       "fault_attribution_accuracy": 0.0,
-      "recovery_advantage_over_regeneration": 0.0
+      "recovery_advantage_over_regeneration": null
     },
     "OURS_CounterexampleRepair": {
       "experiment_id": "OURS_CounterexampleRepair",
@@ -76,10 +76,10 @@
       "constraint_violation_rate": 0.0,
       "repair_success_rate": 1.0,
       "avg_repair_iterations": 1.0,
-      "avg_planning_time_ms": 3.3235000009881333,
-      "avg_verification_time_ms": 0.266899999587622,
-      "avg_repair_time_ms": 3.3235000009881333,
-      "avg_nodes_expanded": 4.0,
+      "avg_planning_time_ms": 3.6101000023336383,
+      "avg_verification_time_ms": 0.19329999850015156,
+      "avg_repair_time_ms": 3.6101000023336383,
+      "avg_nodes_expanded": 5.0,
       "avg_plan_cost": 3.0,
       "fault_attribution_accuracy": 1.0,
       "recovery_advantage_over_regeneration": 0.0

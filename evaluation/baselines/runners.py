@@ -253,5 +253,6 @@ class MethodOurs_CounterexampleRepair:
             "nodes_expanded": res.repaired_plan.nodes_expanded if res.repaired_plan else 0,
             "repair_iterations": res.iterations,
             "final_verification": res.final_verification,
+            "attribution": res.attribution,
             "repairs_applied": res.repairs_applied,
         }

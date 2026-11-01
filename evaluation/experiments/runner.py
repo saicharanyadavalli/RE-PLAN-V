@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from benchmark.generator.generator import BenchmarkGenerator
 from core.actions.domain import create_blocks_world_domain
-from core.contracts import BenchmarkInstanceSchema, GroundActionSchema, PlanSchema
+from core.contracts import BenchmarkInstanceSchema, FaultClass, GroundActionSchema, PlanSchema
 from evaluation.baselines.runners import (
     BaselineB0_DirectNeural,
     BaselineB1_FormalizedPlanner,
@@ -85,7 +85,12 @@ class ExperimentRunner:
             r_ours = ours_runner.run(inst, domain, initial_candidate=invalid_candidate)
             r_ours["initial_plan_was_invalid"] = True
             r_ours["repair_time_ms"] = r_ours.get("planning_time_ms", 0.0)
-            r_ours["attribution_correct"] = True
+            pred_attr = r_ours.get("attribution")
+            pred_class = getattr(pred_attr, "fault_class", None) if pred_attr else None
+            # Injected fault was an invalid stack action without picking up, which is a PLANNING_ERROR
+            r_ours["attribution_correct"] = (
+                pred_class == "PLANNING_ERROR" or pred_class == FaultClass.PLANNING_ERROR
+            )
             ours_collector.record_run(r_ours)
 
         s0 = b0_collector.compute_summary()
@@ -95,7 +100,10 @@ class ExperimentRunner:
         s_ours = ours_collector.compute_summary()
 
         # Recovery advantage = OURS recovery success rate - B3 recovery success rate
-        recovery_advantage = s_ours.repair_success_rate - s3.repair_success_rate
+        if s_ours.repair_success_rate is not None and s3.repair_success_rate is not None:
+            recovery_advantage = round(s_ours.repair_success_rate - s3.repair_success_rate, 4)
+        else:
+            recovery_advantage = None
         s_ours.recovery_advantage_over_regeneration = recovery_advantage
 
         results = {

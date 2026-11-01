@@ -113,16 +113,26 @@ def run_cli_benchmark(num_instances: int = 5, seed: int = 42) -> None:
     for b_name, data in results["summary"].items():
         valid_rate = f"{data['valid_plan_rate'] * 100:.1f}%"
         goal_succ = f"{data['goal_success_rate'] * 100:.1f}%"
-        repair_rate = f"{data['repair_success_rate'] * 100:.1f}%"
+        repair_rate = (
+            f"{data['repair_success_rate'] * 100:.1f}%"
+            if data.get("repair_success_rate") is not None
+            else "N/A"
+        )
         plan_time = f"{data['avg_planning_time_ms']:.2f}"
         print(f"{b_name:<28} | {data['total_instances']:<6} | {valid_rate:<11} | {goal_succ:<13} | {repair_rate:<14} | {plan_time}")
 
     print("=" * 70)
     print("Empirical Finding:")
-    ours_rec = results["summary"]["OURS_CounterexampleRepair"]["repair_success_rate"]
-    b3_rec = results["summary"]["B3_GenericRegeneration"]["repair_success_rate"]
-    print(f"OURS Recovery Rate: {ours_rec * 100:.1f}% vs B3 Generic Regeneration: {b3_rec * 100:.1f}%")
-    print(f"Measured Recovery Advantage: +{(ours_rec - b3_rec) * 100:.1f}%")
+    ours_rec = results["summary"]["OURS_CounterexampleRepair"].get("repair_success_rate")
+    b3_rec = results["summary"]["B3_GenericRegeneration"].get("repair_success_rate")
+    ours_str = f"{ours_rec * 100:.1f}%" if ours_rec is not None else "N/A"
+    b3_str = f"{b3_rec * 100:.1f}%" if b3_rec is not None else "N/A"
+    print(f"OURS Recovery Rate: {ours_str} vs B3 Generic Regeneration: {b3_str}")
+    if ours_rec is not None and b3_rec is not None:
+        adv = (ours_rec - b3_rec) * 100
+        print(f"Measured Recovery Advantage: {adv:+.1f}%")
+    else:
+        print("Measured Recovery Advantage: N/A")
     print("Zero fabricated metrics. Measured directly from deterministic execution.")
     print("=" * 70)
 

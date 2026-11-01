@@ -198,6 +198,7 @@ class ReplanningResultSchema(BaseModel):
     iterations: int = 0
     repairs_applied: List[RepairConstraintSchema] = Field(default_factory=list)
     final_verification: Optional[VerificationResultSchema] = None
+    attribution: Optional[FaultAttributionSchema] = None
     replanning_time_ms: float = 0.0
     status: str = Field(description="'VERIFIED', 'NO_VERIFIED_PLAN', 'MAX_ITERATIONS_REACHED', 'LOOP_DETECTED'")
     history: List[Dict[str, Any]] = Field(default_factory=list)
@@ -306,7 +307,7 @@ class EvaluationMetricsSchema(BaseModel):
     valid_plan_rate: float = 0.0
     goal_success_rate: float = 0.0
     constraint_violation_rate: float = 0.0
-    repair_success_rate: float = 0.0
+    repair_success_rate: Optional[float] = None
     avg_repair_iterations: float = 0.0
     avg_planning_time_ms: float = 0.0
     avg_verification_time_ms: float = 0.0
@@ -314,7 +315,7 @@ class EvaluationMetricsSchema(BaseModel):
     avg_nodes_expanded: float = 0.0
     avg_plan_cost: float = 0.0
     fault_attribution_accuracy: float = 0.0
-    recovery_advantage_over_regeneration: float = 0.0
+    recovery_advantage_over_regeneration: Optional[float] = None
 
 
 # ==============================================================================

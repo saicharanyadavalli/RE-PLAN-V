@@ -45,15 +45,19 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     for b_name, data in primary_results["summary"].items():
         v_rate = f"{data['valid_plan_rate'] * 100:.1f}%"
         g_rate = f"{data['goal_success_rate'] * 100:.1f}%"
-        r_rate = f"{data['repair_success_rate'] * 100:.1f}%"
+        r_val = data.get("repair_success_rate")
+        r_rate = f"{r_val * 100:.1f}%" if r_val is not None else "N/A"
         p_time = f"{data['avg_planning_time_ms']:.2f} ms"
         print(f"{b_name:<28} | {data['total_instances']:<6} | {v_rate:<11} | {g_rate:<13} | {r_rate:<12} | {p_time}")
     print("-" * 80)
 
-    ours_rec = primary_results["summary"]["OURS_CounterexampleRepair"]["repair_success_rate"]
-    b3_rec = primary_results["summary"]["B3_GenericRegeneration"]["repair_success_rate"]
-    advantage = (ours_rec - b3_rec) * 100
-    print(f"\nMeasured Recovery Advantage (OURS vs B3 Generic Regeneration): {advantage:+.1f}%")
+    ours_rec = primary_results["summary"]["OURS_CounterexampleRepair"].get("repair_success_rate")
+    b3_rec = primary_results["summary"]["B3_GenericRegeneration"].get("repair_success_rate")
+    if ours_rec is not None and b3_rec is not None:
+        advantage = (ours_rec - b3_rec) * 100
+        print(f"\nMeasured Recovery Advantage (OURS vs B3 Generic Regeneration): {advantage:+.1f}%")
+    else:
+        print("\nMeasured Recovery Advantage (OURS vs B3 Generic Regeneration): N/A")
 
     # 2. Ablation Study
     print(f"\n[2/3] Executing Component Ablation Studies ({num_instances} instances, seed={seed})...")
@@ -67,7 +71,8 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print("-" * 80)
     for cfg_name, data in ablation_results["ablation_runs"].items():
         summary = data["summary"]
-        rep_rate = f"{summary['repair_success_rate'] * 100:.1f}%"
+        r_val = summary.get("repair_success_rate")
+        rep_rate = f"{r_val * 100:.1f}%" if r_val is not None else "N/A"
         avg_iter = f"{summary['avg_repair_iterations']:.2f}"
         print(f"{cfg_name:<32} | {summary['total_instances']:<10} | {rep_rate:<20} | {avg_iter}")
     print("-" * 80)
@@ -108,15 +113,18 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
         tier_gen.generate_by_tier(tier=t, domain_id=d, measure_now=True)
         for d, t in representative_tiers
     ]
-    print("\n" + "-" * 105)
-    print(f"{'Domain ID':<20} | {'Tier':<8} | {'Est. Bound':<11} | {'Measured States':<17} | {'Transitions':<12} | {'Status':<10} | {'Sample Goal'}")
-    print("-" * 105)
+    print("\n" + "-" * 115)
+    print(f"{'Domain ID':<20} | {'Tier':<8} | {'Analytical Bound':<17} | {'Measured States':<24} | {'Transitions':<12} | {'Status':<10} | {'Sample Goal'}")
+    print("-" * 115)
     for ti in tier_instances:
         goal_str = ", ".join(f"{g['predicate']}({','.join(g['arguments'])})" for g in ti.goal_conditions)
-        states_str = f"{ti.measured_unique_states} states"
+        if ti.is_complete:
+            states_str = f"{ti.measured_unique_states} states"
+        else:
+            states_str = f">={ti.measured_unique_states} (lower bound)"
         status_str = "Complete" if ti.is_complete else "Truncated"
-        print(f"{ti.domain_id:<20} | {ti.tier.value:<8} | {ti.estimated_state_space:<11} | {states_str:<17} | {ti.measured_edges or 0:<12} | {status_str:<10} | {goal_str[:22]}")
-    print("-" * 105)
+        print(f"{ti.domain_id:<20} | {ti.tier.value:<8} | {ti.estimated_state_space:<17} | {states_str:<24} | {ti.measured_edges or 0:<12} | {status_str:<10} | {goal_str[:22]}")
+    print("-" * 115)
 
     # Save summary report
     elapsed = time.perf_counter() - start_time

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from core.contracts import EvaluationMetricsSchema
 
 
@@ -35,8 +35,8 @@ class MetricsCollector:
             repair_success = sum(1 for r in invalid_cases if r.get("success", False))
             repair_rate = float(repair_success / len(invalid_cases))
         else:
-            # If no invalid plans were provided, rate matches overall validity
-            repair_rate = float(valid_count / n)
+            # When no initially invalid plans were provided, repair rate is undefined (None / N/A)
+            repair_rate = None
 
         total_iterations = sum(r.get("repair_iterations", 0) for r in self.records)
         total_plan_time = sum(r.get("planning_time_ms", 0.0) for r in self.records)
@@ -64,10 +64,10 @@ class MetricsCollector:
             attr_acc = 0.0
 
         # Empirical recovery advantage over generic regeneration baseline (signed difference)
-        if self.baseline_regeneration_rate is not None:
+        if self.baseline_regeneration_rate is not None and repair_rate is not None:
             rec_adv = round(repair_rate - self.baseline_regeneration_rate, 4)
         else:
-            rec_adv = 0.0
+            rec_adv = None
 
         return EvaluationMetricsSchema(
             experiment_id=self.experiment_id,
@@ -83,5 +83,5 @@ class MetricsCollector:
             avg_nodes_expanded=float(total_nodes / n),
             avg_plan_cost=float(avg_cost),
             fault_attribution_accuracy=attr_acc,
-            recovery_advantage_over_regeneration=float(rec_adv),
+            recovery_advantage_over_regeneration=rec_adv,
         )

@@ -63,6 +63,7 @@ class ReplanningEngine:
         forbidden_ground_actions: Set[GroundAction] = set()
         seen_counterexamples: Set[str] = set()
         history: List[Dict[str, Any]] = []
+        last_attribution: Optional[FaultAttributionSchema] = None
 
         current_problem = problem
 
@@ -89,6 +90,7 @@ class ReplanningEngine:
                     iterations=iteration,
                     repairs_applied=[r.to_schema() for r in accumulated_repairs],
                     final_verification=v_res,
+                    attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
                     status="VERIFIED",
                     history=history,
@@ -104,6 +106,7 @@ class ReplanningEngine:
                     iterations=iteration,
                     repairs_applied=[r.to_schema() for r in accumulated_repairs],
                     final_verification=v_res,
+                    attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
                     status="MAX_ITERATIONS_REACHED",
                     history=history,
@@ -125,6 +128,7 @@ class ReplanningEngine:
                     iterations=iteration,
                     repairs_applied=[r.to_schema() for r in accumulated_repairs],
                     final_verification=v_res,
+                    attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
                     status="LOOP_DETECTED",
                     history=history,
@@ -138,6 +142,7 @@ class ReplanningEngine:
                 candidate_plan=current_candidate,
                 natural_language_prompt=natural_language_prompt,
             )
+            last_attribution = attribution
 
             # Step 5: Repair generation
             repair = self.repair_generator.generate(cex, attribution, current_problem, domain)
@@ -182,6 +187,7 @@ class ReplanningEngine:
                     iterations=iteration + 1,
                     repairs_applied=[r.to_schema() for r in accumulated_repairs],
                     final_verification=v_res,
+                    attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
                     status="NO_VERIFIED_PLAN",
                     history=history,
@@ -197,6 +203,7 @@ class ReplanningEngine:
             iterations=self.max_repair_iterations,
             repairs_applied=[r.to_schema() for r in accumulated_repairs],
             final_verification=None,
+            attribution=last_attribution,
             replanning_time_ms=elapsed_ms,
             status="NO_VERIFIED_PLAN",
             history=history,
