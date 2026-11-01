@@ -21,7 +21,7 @@ from evaluation.ablations.configurations import AblationStudyRunner
 from evaluation.experiments.runner import ExperimentRunner
 
 
-def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
+def run_all_benchmarks(num_instances: int = 10, seed: int = 42, output_dir: Optional[Path] = None) -> None:
     print("=" * 80)
     print("RE-PLAN-V EMPIRICAL REPRODUCTION BENCHMARK")
     print("Investigating: 'Can counterexample-guided fault attribution and automatic repair")
@@ -29,7 +29,9 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print("=" * 80)
 
     start_time = time.perf_counter()
-    exp_runner = ExperimentRunner()
+    report_dir = Path(output_dir) if output_dir else Path("evaluation/reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    exp_runner = ExperimentRunner(output_dir=report_dir)
     ablation_runner = AblationStudyRunner()
 
     # 1. Primary Comparative Experiment
@@ -128,7 +130,7 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
 
     # Save summary report
     elapsed = time.perf_counter() - start_time
-    output_file = Path("evaluation/reports/full_reproduction_summary.json")
+    output_file = report_dir / "full_reproduction_summary.json"
     output_file.parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, "w", encoding="utf-8", newline="\n") as f:
         json.dump(

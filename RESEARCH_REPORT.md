@@ -24,8 +24,8 @@ In this work, we propose, implement, and empirically validate **RE-PLAN-V**, a s
 ### 1.2 Key Empirical Finding
 Across controlled benchmark suites spanning progressive difficulty tiers (3-6 blocks) and hard constraints:
 - **Generic Regeneration (Baseline B3)**: When an invalid candidate plan is detected, unguided re-sampling of candidate sequences achieves only **50.0% recovery**, requiring an average of **2.2 attempts** and struggling when multi-step unstacking or protected obstacle constraints are present.
-- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100.0% recovery** from initially invalid candidate plans, converging in an average of **1.0 iteration** with an isolated repair latency of **64.95 ms**†.
-  > *†Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms.*
+- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100.0% recovery** from initially invalid candidate plans, converging in an average of **1.0 iteration** with an isolated repair latency of **108.36 ms**†.
+  > *†Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms and 64.95 ms.*
 - **Recovery Advantage**: Demonstrates an empirical **+50.0% recovery advantage** (+50.0 percentage points on the controlled pilot, $N=10$, seed 42; not an unbounded universal guarantee across arbitrary unseen domains) over generic plan regeneration.
 - **Conclusion**: The empirical evidence **affirms** the central research question on the controlled pilot. Targeted constraint injection derived from counterexample witnesses fundamentally outperforms blind candidate regeneration.
 
@@ -96,13 +96,13 @@ Evaluated on $N=10$ randomized benchmark instances (seed=42) across progressive 
 
 | Method / Baseline | Description | Total Tasks | Valid Plan Rate | Goal Success Rate | Repair Recovery Rate | Avg Search / Repair Time (ms) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **B0: Direct Neural** | Raw unverified neural output | 10 | 0.0% | 0.0% | N/A | 0.09 ms |
-| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | N/A* | 16.28 ms |
-| **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 10 | 0.0% | 0.0% | 0.0% | 0.07 ms |
-| **B3: Generic Regeneration** | Unguided candidate re-sampling | 10 | 50.0% | 50.0% | 50.0% | 10.37 ms |
-| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **64.95 ms**† |
+| **B0: Direct Neural** | Raw unverified neural output | 10 | 0.0% | 0.0% | N/A | 0.19 ms |
+| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | N/A* | 115.67 ms |
+| **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 10 | 0.0% | 0.0% | 0.0% | 0.18 ms |
+| **B3: Generic Regeneration** | Unguided candidate re-sampling | 10 | 50.0% | 50.0% | 50.0% | 23.13 ms (repair) / 24.02 ms (total) |
+| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **108.36 ms**† |
 
-† *Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms.*
+† *Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms and 64.95 ms.*
 
 **Empirical Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0% (+50 percentage points on the controlled pilot)**
 

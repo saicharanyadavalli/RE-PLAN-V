@@ -98,12 +98,14 @@ def test_experiment_runner_primary_research_question(tmp_path):
     assert report_file.exists()
 
 
-def test_reproduction_script_execution(monkeypatch, capsys):
+def test_reproduction_script_execution(tmp_path, monkeypatch, capsys):
     from scripts.reproduce_results import run_all_benchmarks
 
-    run_all_benchmarks(num_instances=2, seed=123)
+    run_all_benchmarks(num_instances=2, seed=123, output_dir=tmp_path)
     captured = capsys.readouterr()
     assert "RE-PLAN-V EMPIRICAL REPRODUCTION BENCHMARK" in captured.out
     assert "OURS_CounterexampleRepair" in captured.out
     assert "full" in captured.out
+    assert (tmp_path / "full_reproduction_summary.json").exists()
+    assert (tmp_path / "primary_research_experiment.json").exists()
 

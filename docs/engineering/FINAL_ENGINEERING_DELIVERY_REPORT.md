@@ -186,15 +186,15 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - 4/4 static pages generated without type errors or lint failures.
 
 ### 4.3 Research Reproduction Benchmark
-- **Command**: `python scripts/reproduce_results.py --instances 10`
-- **Elapsed Time**: 4.06 seconds
+- **Command**: `python scripts/reproduce_results.py --instances 10 --seed 42`
+- **Elapsed Time**: 11.88 seconds
 - **Primary Comparative Results**:
-  - `B0_DirectNeural`: 0.0% Valid Plan Rate, N/A Repair Rate
-  - `B1_FormalizedPlanner`: 100.0% Valid Plan Rate, N/A Repair Rate (0 initially invalid plans to repair; denominator is 0)
-  - `B2_VerifierNoRepair`: 0.0% Repair Rate (rejects upon invalidity)
-  - `B3_GenericRegeneration`: 50.0% Repair Rate (unguided sampling)
-  - `OURS_CounterexampleRepair`: **100.0% Repair Rate**
-  - **Empirical Recovery Advantage**: **+50.0%**
+  - `B0_DirectNeural`: 0.0% Valid Plan Rate, N/A Repair Rate (planning time: 0.19 ms)
+  - `B1_FormalizedPlanner`: 100.0% Valid Plan Rate, N/A Repair Rate (planning time: 115.67 ms)
+  - `B2_VerifierNoRepair`: 0.0% Repair Rate (rejects upon invalidity; planning time: 0.18 ms)
+  - `B3_GenericRegeneration`: 50.0% Repair Rate (planning time: 24.02 ms, pure repair time: 23.13 ms)
+  - `OURS_CounterexampleRepair`: **100.0% Repair Rate** (planning time: 108.80 ms, pure repair time: **108.36 ms**)
+  - **Empirical Recovery Advantage**: **+50.0%** (+50.0 percentage points on the controlled pilot, $N=10$, seed 42)
 - **Ablation Study Summary**:
   - Full: 100.0% recovery, 1.00 avg iterations
   - Without Verifier: 0.0% recovery (post-hoc verification confirms invalid candidate fails)
