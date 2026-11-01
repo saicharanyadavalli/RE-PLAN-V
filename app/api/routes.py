@@ -100,6 +100,16 @@ def get_domains() -> List[Dict[str, Any]]:
     return registry.get_metadata_summary()
 
 
+@router.get("/domains/{domain_id}")
+def get_domain_details(domain_id: str) -> Dict[str, Any]:
+    """Returns detailed schema, predicates, actions, invariants, and types for a specific domain."""
+    from core.domains import registry
+    dom = registry.get(domain_id)
+    if not dom:
+        raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found.")
+    return dom.to_dict()
+
+
 class GraphEnumerateRequest(BaseModel):
     domain_id: str = "blocks_world"
     prompt: Optional[str] = "Stack the red box on the blue box."

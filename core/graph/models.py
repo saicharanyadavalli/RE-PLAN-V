@@ -107,6 +107,7 @@ class ReachableStateGraph(BaseModel):
             })
 
         return {
+            "format": "cytoscape",
             "graph_id": self.graph_id,
             "domain_id": self.domain_id,
             "problem_name": self.problem_name,
