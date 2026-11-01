@@ -131,3 +131,60 @@ class ForbidActionBindingConstraint(HardConstraint):
                 if self.entity in action_args:
                     return False, f"Hard constraint violation: action '{action_name}' with entity '{self.entity}' is strictly forbidden."
         return True, None
+
+
+class ForbidActionExactBindingConstraint(HardConstraint):
+    """Prohibits executing an action with exact ordered argument values (e.g. stack(green, yellow))."""
+
+    def __init__(
+        self,
+        forbidden_action: str,
+        arguments: Sequence[str],
+        description: str = "",
+    ) -> None:
+        act = forbidden_action.strip().lower()
+        args_tuple = tuple(a.strip() for a in arguments)
+        name = f"forbid_exact_{act}_{'_'.join(args_tuple)}"
+        super().__init__(name=name, description=description)
+        self.forbidden_action = act
+        self.forbidden_args = args_tuple
+
+    def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
+        if action_name.strip().lower() == self.forbidden_action:
+            if tuple(action_args) == self.forbidden_args:
+                return (
+                    False,
+                    f"Hard constraint violation: exact action '{action_name}({', '.join(action_args)})' is strictly forbidden.",
+                )
+        return True, None
+
+
+class ForbidTransitionConstraint(HardConstraint):
+    """Prohibits transitions targeting a forbidden destination or state (e.g. entering cell_trap or deploying to prod)."""
+
+    def __init__(
+        self,
+        forbidden_action: str,
+        to_entity: str,
+        arg_index: int,
+        from_entity: Optional[str] = None,
+        description: str = "",
+    ) -> None:
+        act = forbidden_action.strip().lower()
+        dst = to_entity.strip()
+        name = f"forbid_transition_{act}_to_{dst}"
+        super().__init__(name=name, description=description)
+        self.forbidden_action = act
+        self.to_entity = dst
+        self.arg_index = arg_index
+        self.from_entity = from_entity.strip() if from_entity else None
+
+    def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
+        if action_name.strip().lower() == self.forbidden_action:
+            if 0 <= self.arg_index < len(action_args):
+                if action_args[self.arg_index] == self.to_entity:
+                    if self.from_entity is None:
+                        return False, f"Hard constraint violation: transition via '{action_name}' to '{self.to_entity}' is strictly forbidden."
+                    elif self.from_entity in action_args:
+                        return False, f"Hard constraint violation: transition via '{action_name}' from '{self.from_entity}' to '{self.to_entity}' is strictly forbidden."
+        return True, None

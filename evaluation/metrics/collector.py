@@ -44,11 +44,12 @@ class MetricsCollector:
         
         # Dedicated isolated timer for repair time
         repair_times = [
-            r.get("repair_time_ms", 0.0)
+            r["repair_time_ms"]
             for r in self.records
-            if r.get("initial_plan_was_invalid", False) or r.get("repair_iterations", 0) > 0
+            if r.get("repair_time_ms") is not None
+            and (r.get("initial_plan_was_invalid", False) or r.get("repair_iterations", 0) > 0)
         ]
-        avg_repair_time = (sum(repair_times) / len(repair_times)) if repair_times else 0.0
+        avg_repair_time = (sum(repair_times) / len(repair_times)) if repair_times else None
 
         total_nodes = sum(r.get("nodes_expanded", 0) for r in self.records)
 
@@ -79,7 +80,7 @@ class MetricsCollector:
             avg_repair_iterations=float(total_iterations / n),
             avg_planning_time_ms=float(total_plan_time / n),
             avg_verification_time_ms=float(total_verif_time / n),
-            avg_repair_time_ms=float(avg_repair_time),
+            avg_repair_time_ms=float(avg_repair_time) if avg_repair_time is not None else None,
             avg_nodes_expanded=float(total_nodes / n),
             avg_plan_cost=float(avg_cost),
             fault_attribution_accuracy=attr_acc,

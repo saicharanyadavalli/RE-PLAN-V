@@ -5,18 +5,18 @@
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.1%20App%20Router-black.svg)](frontend/)
 [![WebSocket](https://img.shields.io/badge/Streaming-Bidirectional%20WebSockets-teal.svg)](app/api/websocket.py)
-[![Tests](https://img.shields.io/badge/Tests-432%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-455%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Symbolic Core](https://img.shields.io/badge/Core-Symbolic--First%20Authoritative-success.svg)](core/)
 [![Zero-API Ready](https://img.shields.io/badge/Zero--API-100%25%20Offline%20Ready-emerald.svg)](core/)
 
 > **Research Question**: *"Can counterexample-guided fault attribution and automatic repair improve recovery from initially invalid plans compared with generic plan regeneration?"*  
-> **Empirical Finding**: **YES**. Grounded counterexample-derived constraints achieve a **100.0% recovery rate** on initially invalid candidate plans compared to **50.0% recovery** for unguided generic plan regeneration, yielding a **+50.0% recovery advantage** with low millisecond repair latency.
+> **Controlled Pilot Finding**: **YES**. On the reproducible synthetic pilot test suite ($N=10$, seed=42), grounded counterexample-derived constraints achieve a **100.0% recovery rate** on initially invalid candidate plans compared to **50.0% recovery** for unguided generic plan regeneration, yielding a **+50.0% recovery advantage** with low millisecond pure repair latency.
 
 ---
 
 ## Table of Contents
 1. [Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
-2. [Where Student Effort Lies: 95% Symbolic Core vs 5% Untrusted LLM](#2-where-student-effort-lies-95-symbolic-core-vs-5-untrusted-llm)
+2. [Architectural Division of Responsibility: Authoritative Symbolic Core vs Untrusted Neural Proposer](#2-architectural-division-of-responsibility-authoritative-symbolic-core-vs-untrusted-neural-proposer)
 3. [Neurosymbolic Architecture](#3-neurosymbolic-architecture)
 4. [Enterprise Next.js 15 Mission Control Dashboard](#4-enterprise-nextjs-15-mission-control-dashboard)
 5. [Why a 2-Billion Parameter Model Excels in RE-PLAN-V](#5-why-a-2-billion-parameter-model-excels-in-re-plan-v)
@@ -41,23 +41,23 @@ The fundamental flaws of LLM-only planning include:
 
 ### The RE-PLAN-V Solution
 RE-PLAN-V introduces an **asymmetric, symbolic-first neurosymbolic planning architecture**:
-1. The **Neural Model (LLM)** is treated strictly as an **untrusted proposer** (< 5% of the codebase). Its only job is translating natural language English into a structured dictionary of domain entities and goals.
-2. The **Symbolic Core** (95% of the codebase) is the **sole authoritative ground truth**. It runs First-Order Logic Robinson MGU unification, optimal $A^*$ search with an admissible Relaxed Planning Graph (RPG) $h_{\max}$ heuristic, independent STRIPS formal verification, minimal counterexample witness extraction, 5-class fault attribution, and negative pruning constraint repair.
+1. The **Neural Model (LLM)** is treated strictly as an **untrusted proposer**. Its only job is translating natural language English into a structured dictionary of domain entities and goals.
+2. The **Symbolic Core** is the **sole authoritative ground truth**. It runs First-Order Logic Robinson MGU unification, optimal $A^*$ search with non-negative action costs, independent STRIPS formal verification, minimal counterexample witness extraction, 5-class fault attribution, and negative pruning constraint repair.
 
 ---
 
-## 2. Where Student Effort Lies: 95% Symbolic Core vs 5% Untrusted LLM
+## 2. Architectural Division of Responsibility: Authoritative Symbolic Core vs Untrusted Neural Proposer
 
-When defending this project in academic viva examinations (CS F407 / U407), the boundary between the external LLM and student-authored algorithms is crystal clear:
+When defending this project in academic viva examinations (CS F407 / U407), the boundary between the external LLM proposer and student-authored algorithms is crystal clear:
 
 | Subsystem | Academic Pillar | Custom Student Implementation | Codebase Path |
 | :--- | :--- | :--- | :--- |
 | **First-Order Logic Core** | KR&R | Robinson's MGU Unification, term substitution, occurs-check, Horn clause forward chaining | [`core/krr/`](core/krr/) |
-| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search, BFS, Best-First Search with provably admissible heuristic ($h \equiv 0$ uniform-cost baseline guaranteeing optimality, and RPG $h_{\max}$ heuristic) | [`core/search/`](core/search/) |
+| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search (UCS baseline guaranteeing path-cost optimality under non-negative action costs), BFS, Best-First Search | [`core/search/`](core/search/) |
 | **STRIPS Formal Verifier** | Formal Methods | Independent state transition checker, invariant validation, mutex detection, goal checking | [`core/verification/`](core/verification/) |
 | **Counterexample Generator** | Formal Diagnostics | Minimal failing sub-trace extraction, state projection, actionable witness creation | [`core/counterexamples/`](core/counterexamples/) |
 | **Fault Attribution Engine** | Diagnostic AI | 5-class evidence-based taxonomy (`PERCEPTION`, `FORMALIZATION`, `PLANNING`, `ENVIRONMENT`, `AMBIGUOUS`) | [`core/attribution/`](core/attribution/) |
-| **Symbolic Repair Engine** | Inductive Synthesis (CEGIS) | Synthesis of negative pruning constraints (`FORBID_ACTION_IN_STATE`, `FORBID_GROUND_ACTION`) into search space | [`core/repair/`](core/repair/) |
+| **Symbolic Repair Engine** | Inductive Synthesis (CEGIS) | Synthesis of typed negative pruning constraints (`FORBID_ACTION`, `FORBID_ACTION_BINDING`, `FORBID_TRANSITION`) into search space | [`core/repair/`](core/repair/) |
 | **Mission Control Dashboard** | Full-Stack Systems | Next.js 15+ App Router, Tailwind CSS, HTML5 Canvas animation, real-time WebSocket lifecycle streaming | [`frontend/`](frontend/) |
 | **Neural Task Translator** | Deep Learning Interface | Optional Pydantic prompt formatter for Gemma 2 2B / Gemini / Zero-API offline mock | [`interpretation/`](interpretation/) |
 
@@ -70,7 +70,7 @@ flowchart TD
     NL["Natural Language Robotic Command\n(e.g., 'Move red box next to blue box. Do not move glass.')"] --> NI["Neural Task Interpreter\n(Gemma 2 2B / Gemini / Zero-API Mock)"]
     NI --> |Untrusted Schema Dictionary| CV["Consistency & Mutex Validator\n(Type-checking, schema bounds)"]
     
-    CV --> |Formal Symbolic Problem\n(Init State S0, Goal State G)| Search["Authoritative Search Planner\n(Optimal A* with RPG h_max)"]
+    CV --> |Formal Symbolic Problem\n(Init State S0, Goal State G)| Search["Authoritative Search Planner\n(Optimal A* with Non-Negative Costs)"]
     
     Search --> |Candidate Action Trajectory| Verifier{"Formal STRIPS Verifier\n(Preconditions, Mutexes, Invariants)"}
     
@@ -80,7 +80,7 @@ flowchart TD
     
     CEx --> FA["5-Class Fault Attribution Engine\n(Perception, Formalization, Planning, Environment)"]
     
-    FA --> Repair["Symbolic Repair Synthesizer\n(Constraint: FORBID_ACTION_IN_STATE)"]
+    FA --> Repair["Symbolic Repair Synthesizer\n(Constraint: FORBID_ACTION_BINDING)"]
     
     Repair --> |Injected Negative Constraints| Replan["Bounded Replanning Loop\n(Prunes Failing Branch from A* Search Graph)"]
     
@@ -112,10 +112,10 @@ The project features a full Next.js 15+ dark-mode Mission Control dashboard (`fr
 
 ## 5. Why a 2-Billion Parameter Model Excels in RE-PLAN-V
 
-A central innovation of RE-PLAN-V is proving that **massive 70B cloud models are not required for reliable robotics**:
+A central practical design choice of RE-PLAN-V is showing that **massive 70B cloud models are not required for reliable robotics task translation**:
 
-1. **Lightweight & Edge-Deployable:** A 2-billion parameter model (e.g., Google Gemma 2 2B or Qwen 2.5 1.5B) requires only **~1.8 GB of VRAM** (or 4-bit quantized ~1.2 GB), allowing it to run smoothly on edge robotic hardware or modest laptops.
-2. **Speed & Efficiency:** Inference latency is **~100–350 ms** on consumer GPU (e.g. RTX 4060) or local CPU fallback, compared to 1–3 seconds for cloud APIs.
+1. **Lightweight & Edge-Deployable:** A 2-billion parameter model (e.g., Google Gemma 2 2B or Qwen 2.5 1.5B) has an illustrative hardware profile of **~1.6–2.0 GB VRAM** in 4-bit quantization, enabling local execution on modest laptops or edge devices.
+2. **Speed & Efficiency:** Typical local inference latency is **~150–350 ms** on consumer GPUs (e.g. RTX 4060) or CPU fallback, avoiding external network round-trips.
 3. **Formal Verification Safety Net:** Because the LLM's role is strictly confined to grammar translation, any potential hallucination is caught and rejected by our STRIPS verifier.
 4. **Formally Verified Plan Correctness:** Pairing an efficient 2B model with RE-PLAN-V's authoritative symbolic verifier delivers **formally verified symbolic plans under declared domain invariants**, catching any neural hallucination at zero API cost.
 
@@ -212,7 +212,7 @@ python -m app.main --mode benchmark --instances 5 --seed 42
 # Execute full pytest suite with coverage
 pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app --cov-report=term-missing
 ```
-*Result:* **432 passing tests**, **87%+ overall coverage**, 100% test pass rate.
+*Result:* **455 passing tests** across 46 test modules, **87%+ overall coverage**, 100% test pass rate.
 
 ---
 

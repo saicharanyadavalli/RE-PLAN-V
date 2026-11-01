@@ -48,7 +48,7 @@ Across controlled benchmark suites spanning progressive difficulty tiers (3-6 bl
   [Authoritative Symbolic Model] (Entities, Predicates, Invariants, Goal)
                  │
                  ▼
-   [Classical Search Planners]  (A* with RPG h_max, BFS, Greedy Best-First)
+   [Classical Search Planners]  (A* with ZeroHeuristic UCS, BFS, Greedy Best-First)
                  │
                  ▼
        [Candidate Plan]
@@ -95,8 +95,8 @@ Evaluated on $N=10$ randomized benchmark instances (seed=42) across progressive 
 
 | Method / Baseline | Description | Total Tasks | Valid Plan Rate | Goal Success Rate | Repair Recovery Rate | Avg Search / Repair Time (ms) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **B0: Direct Neural** | Raw unverified neural output | 10 | 0.0% | 0.0% | 0.0% | 0.09 ms |
-| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | 100.0%* | 16.28 ms |
+| **B0: Direct Neural** | Raw unverified neural output | 10 | 0.0% | 0.0% | N/A | 0.09 ms |
+| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | N/A* | 16.28 ms |
 | **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 10 | 0.0% | 0.0% | 0.0% | 0.07 ms |
 | **B3: Generic Regeneration** | Unguided candidate re-sampling | 10 | 50.0% | 50.0% | 50.0% | 10.37 ms |
 | **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **18.42 ms** |
@@ -163,4 +163,4 @@ State space analysis across all 6 domains comparing analytical bounds with empir
 ---
 
 ## 5. Conclusion
-RE-PLAN-V demonstrates that formal verification coupled with counterexample-guided symbolic repair provides a rigorous, explainable, and provably reliable foundation for autonomous planning, definitively surpassing unguided neural regeneration.
+RE-PLAN-V demonstrates that formal verification coupled with counterexample-guided symbolic repair provides a rigorous, explainable foundation for autonomous planning, achieving a measured +50.0% recovery advantage over unguided regeneration in controlled pilot evaluations.

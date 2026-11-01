@@ -49,8 +49,13 @@ class ReplanningEngine:
         initial_candidate: Optional[PlanSchema] = None,
         natural_language_prompt: Optional[str] = None,
     ) -> ReplanningResultSchema:
-        """Executes Candidate -> Verify -> Counterexample -> Attribution -> Repair -> Replan -> Verify."""
+        """Executes Candidate -> Verify -> Counterexample -> Attribution -> Repair -> Replan -> Verify.
+
+        Isolates pure_repair_time_ms strictly around repair operations (counterexample extraction,
+        fault attribution, repair constraint synthesis, and replanning search), excluding initial candidate time.
+        """
         start_time = time.perf_counter()
+        pure_repair_time_ms = 0.0
 
         # Step 1: Obtain or generate initial candidate plan
         if initial_candidate is None:
@@ -92,6 +97,7 @@ class ReplanningEngine:
                     final_verification=v_res,
                     attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
+                    pure_repair_time_ms=pure_repair_time_ms,
                     status="VERIFIED",
                     history=history,
                 )
@@ -108,18 +114,24 @@ class ReplanningEngine:
                     final_verification=v_res,
                     attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
+                    pure_repair_time_ms=pure_repair_time_ms,
                     status="MAX_ITERATIONS_REACHED",
                     history=history,
                 )
 
+            # Measure strictly isolated repair iteration time
+            t_iter_start = time.perf_counter()
+
             # Step 3: Counterexample generation
             cex = self.cex_generator.generate(v_res, current_problem)
             if cex is None:
+                pure_repair_time_ms += (time.perf_counter() - t_iter_start) * 1000.0
                 break
 
             # Loop detection guard
             cex_signature = f"{cex.action_index}:{cex.offending_action.to_string()}:{cex.violated_condition.to_string()}"
             if cex_signature in seen_counterexamples:
+                pure_repair_time_ms += (time.perf_counter() - t_iter_start) * 1000.0
                 elapsed_ms = (time.perf_counter() - start_time) * 1000.0
                 return ReplanningResultSchema(
                     success=False,
@@ -130,6 +142,7 @@ class ReplanningEngine:
                     final_verification=v_res,
                     attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
+                    pure_repair_time_ms=pure_repair_time_ms,
                     status="LOOP_DETECTED",
                     history=history,
                 )
@@ -178,6 +191,8 @@ class ReplanningEngine:
                 prune_action_callback=prune_callback,
             )
 
+            pure_repair_time_ms += (time.perf_counter() - t_iter_start) * 1000.0
+
             if not new_plan.is_success:
                 elapsed_ms = (time.perf_counter() - start_time) * 1000.0
                 return ReplanningResultSchema(
@@ -189,6 +204,7 @@ class ReplanningEngine:
                     final_verification=v_res,
                     attribution=last_attribution,
                     replanning_time_ms=elapsed_ms,
+                    pure_repair_time_ms=pure_repair_time_ms,
                     status="NO_VERIFIED_PLAN",
                     history=history,
                 )
@@ -205,6 +221,7 @@ class ReplanningEngine:
             final_verification=None,
             attribution=last_attribution,
             replanning_time_ms=elapsed_ms,
+            pure_repair_time_ms=pure_repair_time_ms,
             status="NO_VERIFIED_PLAN",
             history=history,
         )
@@ -265,6 +282,7 @@ class ReplanningEngine:
     ) -> ReplanningResultSchema:
         """Baseline B3: Generic unguided regeneration without counterexample repair constraints."""
         start_time = time.perf_counter()
+        pure_repair_time_ms = 0.0
         current_candidate = initial_candidate
         history: List[Dict[str, Any]] = []
         rng = random.Random(seed)
@@ -286,6 +304,7 @@ class ReplanningEngine:
                     repairs_applied=[],
                     final_verification=v_res,
                     replanning_time_ms=elapsed_ms,
+                    pure_repair_time_ms=pure_repair_time_ms,
                     status="VERIFIED",
                     history=history,
                 )
@@ -294,7 +313,9 @@ class ReplanningEngine:
                 break
 
             # Unguided regeneration: sample alternative candidate plan without CEX constraints
+            t_reg_start = time.perf_counter()
             current_candidate = self._sample_candidate_plan(problem, domain, rng)
+            pure_repair_time_ms += (time.perf_counter() - t_reg_start) * 1000.0
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         return ReplanningResultSchema(
@@ -305,6 +326,7 @@ class ReplanningEngine:
             repairs_applied=[],
             final_verification=v_res,
             replanning_time_ms=elapsed_ms,
+            pure_repair_time_ms=pure_repair_time_ms,
             status="REGENERATION_FAILED",
             history=history,
         )

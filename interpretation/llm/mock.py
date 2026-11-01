@@ -5,7 +5,12 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 from core.actions.domain import Domain
-from core.contracts import FactSchema, TaskProposalSchema
+from core.contracts import (
+    FactSchema,
+    TaskConstraintSchema,
+    TaskConstraintType,
+    TaskProposalSchema,
+)
 from interpretation.llm.base import BaseLLMProvider
 
 
@@ -29,6 +34,7 @@ class MockLLMProvider(BaseLLMProvider):
                     initial_facts=routing.initial_facts,
                     goal_facts=routing.goal_facts,
                     negative_constraints=routing.negative_constraints,
+                    typed_constraints=getattr(routing, "typed_constraints", []),
                     confidence=routing.domain_confidence,
                 )
             # Fail closed: never fall through to blocks world patterns
@@ -360,9 +366,31 @@ class MockLLMProvider(BaseLLMProvider):
                 FactSchema(predicate="on", arguments=("red_box", "blue_box")),
             ]
             negative_constraints = []
+            typed_constraints = []
             if "do not move the glass" in prompt_lower or "do not touch glass" in prompt_lower or "do not" in prompt_lower:
                 negative_constraints = [
                     FactSchema(predicate="holding", arguments=("glass",)),
+                ]
+                typed_constraints = [
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="pick_up",
+                        entity="glass",
+                        arg_index=0,
+                        description="Do not pick up glass",
+                    ),
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="unstack",
+                        entity="glass",
+                        arg_index=0,
+                        description="Do not unstack glass",
+                    ),
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="holding", arguments=("glass",)),
+                        description="State holding(glass) forbidden",
+                    ),
                 ]
 
             return TaskProposalSchema(
@@ -372,6 +400,7 @@ class MockLLMProvider(BaseLLMProvider):
                 initial_facts=initial_facts,
                 goal_facts=goal_facts,
                 negative_constraints=negative_constraints,
+                typed_constraints=typed_constraints,
                 confidence=1.0,
             )
 
@@ -392,6 +421,7 @@ class MockLLMProvider(BaseLLMProvider):
 
             neg_match = re.search(r"do not (?:move|touch|hold)\s+([a-zA-Z0-9_]+)", prompt_lower)
             negative_constraints = []
+            typed_constraints = []
             if neg_match:
                 prot_obj = neg_match.group(1)
                 entities[prot_obj] = "block"
@@ -400,6 +430,27 @@ class MockLLMProvider(BaseLLMProvider):
                     FactSchema(predicate="clear", arguments=(prot_obj,)),
                 ])
                 negative_constraints.append(FactSchema(predicate="holding", arguments=(prot_obj,)))
+                typed_constraints.extend([
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="pick_up",
+                        entity=prot_obj,
+                        arg_index=0,
+                        description=f"Do not pick up {prot_obj}",
+                    ),
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="unstack",
+                        entity=prot_obj,
+                        arg_index=0,
+                        description=f"Do not unstack {prot_obj}",
+                    ),
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="holding", arguments=(prot_obj,)),
+                        description=f"State holding({prot_obj}) forbidden",
+                    ),
+                ])
 
             return TaskProposalSchema(
                 task_id="mock_stack_task",
@@ -408,6 +459,7 @@ class MockLLMProvider(BaseLLMProvider):
                 initial_facts=initial_facts,
                 goal_facts=goal_facts,
                 negative_constraints=negative_constraints,
+                typed_constraints=typed_constraints,
                 confidence=0.95,
             )
 
@@ -423,6 +475,7 @@ class MockLLMProvider(BaseLLMProvider):
                 initial_facts=routing.initial_facts,
                 goal_facts=routing.goal_facts,
                 negative_constraints=routing.negative_constraints,
+                typed_constraints=getattr(routing, "typed_constraints", []),
                 confidence=routing.domain_confidence,
             )
 

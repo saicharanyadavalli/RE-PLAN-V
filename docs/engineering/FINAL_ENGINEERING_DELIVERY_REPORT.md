@@ -30,6 +30,7 @@ RE-PLAN-V has completed its comprehensive single-main-branch staged hardening, s
   12. `1925124` — *Stage 10.5 - 10.7*: Dual field graph transport contract (`id`/`node_id`, `is_truncated_boundary`), domain-aware state inspector, dynamic attribution confusion matrix endpoint, and signed advantage (DEF-10.5, DEF-10.6, DEF-10.7).
   13. `4937466` — *Stage 10.8*: Research methodology correction: B0/B1 repair rate `None` / `N/A` with zero invalid cases, empirical ground truth attribution check, and empirical lower bound labeling (DEF-10.8, DEF-10.9, DEF-10.10).
   14. `dd411ce` — *Stage 10.9*: Strict 422 boundary validation (`ge=1`, `gt=0.0`) and prompt injection containment defenses (DEF-10.11).
+  15. *Stage 11*: Typed action constraints, unified problem builder, graph budget ceilings/concurrency, pure isolated repair timer, security sandbox boundaries, A* weighted cost oracle, REST/WS parity, benchmark UI provenance (ST11-01 through ST11-08).
 
 ---
 
@@ -86,16 +87,29 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 | **DEF-10.8** | `HIGH` | `evaluation/metrics/collector.py`, `core/contracts.py` | Corrected denominator for repair rate: reports `None` (`"N/A"`) when 0 invalid candidate plans exist. | `test_stage_10_evaluation_metrics_denominators.py` (4 passed). | **VERIFIED_CLOSED** |
 | **DEF-10.9** | `HIGH` | `evaluation/experiments/runner.py` | Evaluated `attribution_correct` against ground truth `PLANNING_ERROR` from `r_ours["attribution"]`. | Research benchmark reproduction suite. | **VERIFIED_CLOSED** |
 | **DEF-10.10** | `MEDIUM` | `scripts/reproduce_results.py`, `README.md` | Labeled truncated Model B graphs with explicit `(empirical lower bound, edge-capped)`. | Benchmark table output and documentation. | **VERIFIED_CLOSED** |
-| **DEF-10.11** | `MEDIUM` | `app/api/routes.py` | Added strict `ge=1` and `gt=0.0` Pydantic bounds (returning HTTP 422) and prompt injection containment. | `tests/unit/test_stage_10_security_resource_bounds.py` (6 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.11** | `MEDIUM` | `app/api/routes.py` | Added strict `ge=1` and `gt=0.0` Pydantic bounds (returning HTTP 422) and prompt injection containment. | `tests/unit/test_stage_10_security_resource_bounds.py` (9 passed). | **VERIFIED_CLOSED** |
+
+### 3.2 Stage 11 Defect Closeout Matrix (ST11-01 through ST11-08)
+
+| Defect ID | Severity | File Path | Remediation Summary | Verification Test Evidence | Final Status |
+|:---|:---|:---|:---|:---|:---|
+| **ST11-01** | `CRITICAL` | `core/contracts.py`, `core/world/constraints.py`, `interpretation/validator/validator.py`, `interpretation/router.py` | Action-level negative constraints wired end-to-end into `SymbolicProblem.hard_constraints`. | `tests/integration/test_stage_11_constraint_pipeline_integration.py` (5 passed). | **VERIFIED_CLOSED** |
+| **ST11-02** | `CRITICAL` | `app/services/problem_builder.py`, `app/api/routes.py`, `app/api/websocket.py`, `core/graph/enumerator.py` | Unified problem construction across REST, WebSocket, and pipeline with initial-state invariant validation before exploration. | `test_stage_11_initial_state_graph_validation.py` (3 passed). | **VERIFIED_CLOSED** |
+| **ST11-03** | `HIGH` | `core/graph/resource_limits.py`, `app/api/routes.py`, `app/api/websocket.py` | Graph endpoints hard resource ceilings ($\le 5000$ nodes, $\le 20000$ edges, $\le 30$s), bounded concurrency (max 2), and async offload via `asyncio.to_thread`. | `test_stage_11_resource_budget_boundaries.py` (6 passed). | **VERIFIED_CLOSED** |
+| **ST11-04** | `HIGH` | `core/replanning/loop.py`, `evaluation/baselines/runners.py`, `evaluation/experiments/runner.py`, `evaluation/metrics/collector.py` | Isolated pure repair time (`pure_repair_time_ms`) strictly around repair operations; B0/B1 report `None`. | `tests/unit/test_stage_11_repair_time_measurement.py` (3 passed). | **VERIFIED_CLOSED** |
+| **ST11-05** | `HIGH` | `tests/unit/test_stage_11_security_sandbox_boundaries.py`, `interpretation/validator/validator.py` | Validator schema tampering defense, unregistered action rejection, and execution side-effect isolation. | `test_stage_11_security_sandbox_boundaries.py` (3 passed). | **VERIFIED_CLOSED** |
+| **ST11-06** | `HIGH` | `tests/unit/test_stage_11_astar_weighted_optimality.py`, `tests/integration/test_stage_11_rest_websocket_problem_parity.py` | Weighted-cost A* optimality oracle test, negative action cost rejection, and REST/WebSocket transport parity test. | 3 passed tests (`test_stage_11_astar_weighted_optimality.py`, `test_stage_11_rest_websocket_problem_parity.py`). | **VERIFIED_CLOSED** |
+| **ST11-07** | `MEDIUM` | `frontend/components/BenchmarkTab.tsx` | Benchmark UI lifecycle states (`NOT_RUN`, `LOADING`, `LOADED`, `STALE`, `FAILED`), provenance banner, and isolated repair time column. | Clean Next.js 15 production build (`npm run build`). | **VERIFIED_CLOSED** |
+| **ST11-08** | `MEDIUM` | `README.md`, `RESEARCH_REPORT.md` | Research claims calibrated to controlled pilot data, reconciled 455 test counts across 46 files in JUnit XML. | Document updates and JUnit XML reconciliation. | **VERIFIED_CLOSED** |
 
 ---
 
 ## 4. Comprehensive Empirical & Verification Evidence
 
 ### 4.1 Backend Test Suite Execution
-- **Command**: `pytest`
-- **Result**: **432 passed**, 2 warnings in 20.47s
-- **Breakdown**:
+- **Command**: `pytest tests/ -q`
+- **Result**: **455 passed**, 2 warnings in 21.30s
+- **Breakdown** (46 test files, exactly 455 passed):
   - `tests/edge_cases/test_edge_cases.py`: 16 passed
   - `tests/integration/test_multi_domain_pipeline.py`: 5 passed
   - `tests/integration/test_pipeline_e2e.py`: 13 passed
@@ -103,6 +117,10 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - `tests/integration/test_stage_10_domain_invariants_pipeline.py`: 4 passed
   - `tests/integration/test_stage_10_fail_closed_pipeline.py`: 11 passed
   - `tests/integration/test_stage_10_graph_transport_contract.py`: 3 passed
+  - `tests/integration/test_stage_11_constraint_pipeline_integration.py`: 5 passed
+  - `tests/integration/test_stage_11_initial_state_graph_validation.py`: 3 passed
+  - `tests/integration/test_stage_11_resource_budget_boundaries.py`: 6 passed
+  - `tests/integration/test_stage_11_rest_websocket_problem_parity.py`: 1 passed
   - `tests/integration/test_websocket_streaming.py`: 6 passed
   - `tests/property/test_properties.py`: 11 passed
   - `tests/scenarios/test_failure_scenarios.py`: 12 passed
@@ -123,14 +141,17 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - `tests/unit/test_krr.py`: 6 passed
   - `tests/unit/test_lm_studio_provider.py`: 5 passed
   - `tests/unit/test_multi_domain_benchmarks.py`: 3 passed
-  - `tests/unit/test_nlp_corpus.py`: 145 passed (146 natural language corpus cases evaluated across tests)
+  - `tests/unit/test_nlp_corpus.py`: 146 passed
   - `tests/unit/test_repair.py`: 3 passed
   - `tests/unit/test_retry_tree.py`: 4 passed
   - `tests/unit/test_search.py`: 8 passed
   - `tests/unit/test_stage_10_astar_optimality.py`: 3 passed
   - `tests/unit/test_stage_10_evaluation_metrics_denominators.py`: 4 passed
   - `tests/unit/test_stage_10_negative_constraint_semantics.py`: 5 passed
-  - `tests/unit/test_stage_10_security_resource_bounds.py`: 6 passed
+  - `tests/unit/test_stage_10_security_resource_bounds.py`: 9 passed
+  - `tests/unit/test_stage_11_astar_weighted_optimality.py`: 2 passed
+  - `tests/unit/test_stage_11_repair_time_measurement.py`: 3 passed
+  - `tests/unit/test_stage_11_security_sandbox_boundaries.py`: 3 passed
   - `tests/unit/test_state_space_explorer.py`: 6 passed
   - `tests/unit/test_verification.py`: 7 passed
   - `tests/unit/test_vision.py`: 3 passed
@@ -177,7 +198,7 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 ## 5. Architectural & Safety Principles
 
 1. **Text-First Interaction**: Primary user interaction is textbox-driven natural language instructions. No camera or image upload is required or part of the primary workflow.
-2. **Neuro-Symbolic Authority**: LLM serves as an untrusted proposal generator (<5% of code). The symbolic core (95% of code) owns domain semantics, invariant validation, search, formal verification, counterexample generation, and repair constraint synthesis.
+2. **Neuro-Symbolic Authority**: The LLM functions strictly as an unverified natural-language proposal generator. The formal symbolic core holds final authority over domain semantics, type validation, invariant enforcement, search, formal verification, counterexample extraction, and repair constraint synthesis.
 3. **Model-Relative Safety**: All verification guarantees are strictly relative to the declared STRIPS domain models and formal invariants. RE-PLAN-V is an algorithmic and neuro-symbolic research system; it does not issue live motor commands or guarantee physical hardware safety.
 4. **Zero-API Offline Integrity**: Complete functionality is deterministic and testable offline with zero required external network dependencies.
 
@@ -185,6 +206,6 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 
 ## 6. Sign-off & Delivery Conclusion
 
-All acceptance criteria across Stages 0 through 9 have been fulfilled with explicit executable command evidence. All 11 cataloged defects are closed. The repository is linear, clean, and has `main` as its sole canonical branch.
+All acceptance criteria across Stages 0 through 11 have been fulfilled with explicit executable command evidence. All 30 cataloged defects across Stages 0–9 (DEF-01 to DEF-11), Stage 10 (DEF-10.1 to DEF-10.11), and Stage 11 (ST11-01 to ST11-08) are closed. The repository is linear, clean, and has `main` as its sole canonical branch.
 
 **Final Release Status**: `ACCEPTED_AND_VERIFIED_ON_MAIN`

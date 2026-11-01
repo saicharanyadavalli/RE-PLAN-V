@@ -7,10 +7,15 @@ from core.actions.domain import Domain
 from core.contracts import (
     FactSchema,
     ProposalValidationResult,
+    TaskConstraintType,
     TaskProposalSchema,
     ValidationStatus,
 )
 from core.world.constraints import (
+    ForbidActionBindingConstraint,
+    ForbidActionConstraint,
+    ForbidActionExactBindingConstraint,
+    ForbidTransitionConstraint,
     HardConstraint,
     Invariant,
     NegativeFactInvariant,
@@ -147,6 +152,35 @@ class ConsistencyValidator:
                     f"Direct contradiction: goal condition '{neg.to_string()}' is simultaneously declared as a negative constraint."
                 )
 
+        # Validate first-class typed constraints
+        for tc in getattr(proposal, "typed_constraints", []):
+            if tc.action_name:
+                act_schema = domain.get_action(tc.action_name) if hasattr(domain, "get_action") else None
+                if not act_schema:
+                    errors.append(f"Typed constraint specifies unsupported action '{tc.action_name}' for domain '{domain.name}'.")
+                else:
+                    if tc.arg_index is not None:
+                        if tc.arg_index < 0 or tc.arg_index >= len(act_schema.parameters):
+                            errors.append(
+                                f"Typed constraint specifies invalid arg_index {tc.arg_index} for action '{tc.action_name}' "
+                                f"(arity: {len(act_schema.parameters)})."
+                            )
+                    if tc.arguments:
+                        if len(tc.arguments) != len(act_schema.parameters):
+                            errors.append(
+                                f"Typed constraint argument count mismatch for '{tc.action_name}': "
+                                f"expected {len(act_schema.parameters)}, got {len(tc.arguments)}."
+                            )
+                        for a in tc.arguments:
+                            if not registry.has_object(a):
+                                errors.append(f"Typed constraint references unknown entity '{a}' in arguments.")
+            if tc.entity and not registry.has_object(tc.entity):
+                errors.append(f"Typed constraint references unknown entity '{tc.entity}'.")
+            if tc.to_entity and not registry.has_object(tc.to_entity):
+                errors.append(f"Typed constraint references unknown to_entity '{tc.to_entity}'.")
+            if tc.from_entity and not registry.has_object(tc.from_entity):
+                errors.append(f"Typed constraint references unknown from_entity '{tc.from_entity}'.")
+
         # Check domain default invariants on initial state if no prior errors
         if not errors and proposal.initial_facts:
             try:
@@ -171,7 +205,7 @@ class ConsistencyValidator:
                 status = ValidationStatus.ARITY_MISMATCH
             elif any("Type mismatch" in e for e in errors):
                 status = ValidationStatus.TYPE_MISMATCH
-            elif any("Unsupported predicate" in e for e in errors):
+            elif any("Unsupported predicate" in e or "unsupported action" in e for e in errors):
                 status = ValidationStatus.UNSUPPORTED_OPERATOR
 
             return ProposalValidationResult(
@@ -225,6 +259,62 @@ class ConsistencyValidator:
             if inv_fact.is_negated:
                 invariants.append(NegativeFactInvariant(fact_cond.positive_version()))
 
+        # 1. Process first-class typed constraints
+        for tc in getattr(proposal, "typed_constraints", []):
+            if tc.constraint_type == TaskConstraintType.FORBID_STATE_FACT and tc.state_fact:
+                fact_cond = Fact.from_schema(tc.state_fact)
+                invariants.append(
+                    NegativeFactInvariant(
+                        fact_cond.positive_version(),
+                        description=tc.description or f"Forbidden state: {fact_cond.to_string()}",
+                    )
+                )
+            elif tc.constraint_type == TaskConstraintType.FORBID_ACTION and tc.action_name:
+                hard_constraints.append(
+                    ForbidActionConstraint(
+                        tc.action_name,
+                        description=tc.description or f"Action '{tc.action_name}' strictly forbidden.",
+                    )
+                )
+            elif tc.constraint_type == TaskConstraintType.FORBID_ACTION_BINDING:
+                if tc.arguments and tc.action_name:
+                    hard_constraints.append(
+                        ForbidActionExactBindingConstraint(
+                            tc.action_name,
+                            tc.arguments,
+                            description=tc.description or f"Action '{tc.action_name}({', '.join(tc.arguments)})' forbidden.",
+                        )
+                    )
+                elif tc.entity and tc.action_name:
+                    hard_constraints.append(
+                        ForbidActionBindingConstraint(
+                            tc.action_name,
+                            tc.entity,
+                            arg_index=tc.arg_index,
+                            description=tc.description or f"Action '{tc.action_name}' with entity '{tc.entity}' forbidden.",
+                        )
+                    )
+            elif tc.constraint_type == TaskConstraintType.FORBID_TRANSITION:
+                if tc.action_name and tc.to_entity and tc.arg_index is not None:
+                    hard_constraints.append(
+                        ForbidTransitionConstraint(
+                            tc.action_name,
+                            tc.to_entity,
+                            tc.arg_index,
+                            from_entity=tc.from_entity,
+                            description=tc.description or f"Transition via '{tc.action_name}' to '{tc.to_entity}' forbidden.",
+                        )
+                    )
+                if tc.state_fact:
+                    fact_cond = Fact.from_schema(tc.state_fact)
+                    invariants.append(
+                        NegativeFactInvariant(
+                            fact_cond.positive_version(),
+                            description=tc.description or f"Forbidden transition state: {fact_cond.to_string()}",
+                        )
+                    )
+
+        # 2. Backwards-compatible negative_constraints conversion
         for neg in proposal.negative_constraints:
             fact_cond = Fact.from_schema(neg)
             invariants.append(
@@ -233,6 +323,18 @@ class ConsistencyValidator:
                     description=f"Negative constraint: {fact_cond.to_string()} must never hold.",
                 )
             )
+            # If no typed constraints were supplied, deterministically infer action-level constraints
+            if not getattr(proposal, "typed_constraints", []):
+                p_name = fact_cond.predicate.lower()
+                if p_name == "holding" and fact_cond.arguments and domain.name in ("blocks_world", "blocks"):
+                    hard_constraints.append(ForbidActionBindingConstraint("pick_up", fact_cond.arguments[0], arg_index=0))
+                    hard_constraints.append(ForbidActionBindingConstraint("unstack", fact_cond.arguments[0], arg_index=0))
+                elif p_name == "on" and len(fact_cond.arguments) >= 2 and domain.name in ("blocks_world", "blocks"):
+                    hard_constraints.append(ForbidActionExactBindingConstraint("stack", [fact_cond.arguments[0], fact_cond.arguments[1]]))
+                elif p_name == "at" and len(fact_cond.arguments) >= 2 and domain.name in ("grid_world", "grid"):
+                    hard_constraints.append(ForbidTransitionConstraint("move", fact_cond.arguments[1], arg_index=2))
+                elif p_name == "deployed_to" and len(fact_cond.arguments) >= 2 and domain.name == "software_workflow":
+                    hard_constraints.append(ForbidActionBindingConstraint("deploy", fact_cond.arguments[1], arg_index=1))
 
         return SymbolicProblem(
             name=problem_name,

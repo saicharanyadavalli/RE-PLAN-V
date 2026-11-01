@@ -12,7 +12,7 @@ import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field
 
-from core.contracts import FactSchema
+from core.contracts import FactSchema, TaskConstraintSchema, TaskConstraintType
 from core.domains import DomainRegistry, registry as default_registry
 
 
@@ -32,6 +32,7 @@ class DomainRoutingResult(BaseModel):
     initial_facts: List[FactSchema] = Field(default_factory=list)
     goal_facts: List[FactSchema] = Field(default_factory=list)
     negative_constraints: List[FactSchema] = Field(default_factory=list)
+    typed_constraints: List[TaskConstraintSchema] = Field(default_factory=list)
     clarification_question: Optional[str] = None
     explanation: str = ""
     raw_prompt: str = ""
@@ -178,9 +179,10 @@ class DomainRouter:
         initial_facts: List[FactSchema] = []
         goal_facts: List[FactSchema] = []
         negative_constraints: List[FactSchema] = []
+        typed_constraints: List[TaskConstraintSchema] = []
 
         # Extract negative constraints across all 6 domains
-        self._extract_negative_constraints(p_clean, best_domain_id, entities, negative_constraints)
+        self._extract_negative_constraints(p_clean, best_domain_id, entities, negative_constraints, typed_constraints)
 
         # Extract domain-specific entities, initial facts, and goal facts
         if best_domain_id in ("blocks_world", "blocks"):
@@ -207,6 +209,7 @@ class DomainRouter:
             initial_facts=initial_facts,
             goal_facts=goal_facts,
             negative_constraints=negative_constraints,
+            typed_constraints=typed_constraints,
             explanation=f"Successfully routed to '{best_domain_id}' with keyword match score {best_score:.1f}.",
             raw_prompt=prompt,
         )
@@ -217,8 +220,12 @@ class DomainRouter:
         domain_id: str,
         entities: Dict[str, str],
         negative_constraints: List[FactSchema],
+        typed_constraints: Optional[List[TaskConstraintSchema]] = None,
     ) -> None:
         """Extracts scoped negative constraints using comprehensive natural language patterns."""
+        if typed_constraints is None:
+            typed_constraints = []
+
         # Pattern 1: Prohibited placement / stacking ("never put/place/stack X on/onto Y")
         stack_prohibitions = re.findall(
             r"(?:do not|don't|never|must not|avoid|without)\s+(?:put|putting|place|placing|stack|stacking)\s+(?:the\s+)?([a-z0-9_]+)\s+(?:on|onto)\s+(?:the\s+)?([a-z0-9_]+)",
@@ -231,6 +238,23 @@ class DomainRouter:
                 entities[top_clean] = "block"
                 entities[bot_clean] = "block"
                 negative_constraints.append(FactSchema(predicate="on", arguments=(top_clean, bot_clean)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="stack",
+                        arguments=[top_clean, bot_clean],
+                        description=f"Prohibit stacking {top_clean} on {bot_clean}",
+                        source_text=text,
+                    )
+                )
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="on", arguments=(top_clean, bot_clean)),
+                        description=f"State on({top_clean}, {bot_clean}) forbidden",
+                        source_text=text,
+                    )
+                )
             elif domain_id in ("household", "household_robotics"):
                 entities[top_clean] = "item"
                 entities[bot_clean] = "surface"
@@ -250,9 +274,47 @@ class DomainRouter:
             if domain_id in ("blocks_world", "blocks"):
                 entities[obj_clean] = "block"
                 negative_constraints.append(FactSchema(predicate="holding", arguments=(obj_clean,)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="pick_up",
+                        entity=obj_clean,
+                        arg_index=0,
+                        description=f"Do not pick up {obj_clean}",
+                        source_text=text,
+                    )
+                )
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="unstack",
+                        entity=obj_clean,
+                        arg_index=0,
+                        description=f"Do not unstack {obj_clean}",
+                        source_text=text,
+                    )
+                )
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="holding", arguments=(obj_clean,)),
+                        description=f"State holding({obj_clean}) forbidden",
+                        source_text=text,
+                    )
+                )
             elif domain_id in ("grid_world", "grid"):
                 entities[obj_clean] = "item"
                 negative_constraints.append(FactSchema(predicate="holding_item", arguments=("agent", obj_clean)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="pickup",
+                        entity=obj_clean,
+                        arg_index=1,
+                        description=f"Do not pick up {obj_clean}",
+                        source_text=text,
+                    )
+                )
             elif domain_id in ("household", "household_robotics"):
                 entities[obj_clean] = "item"
                 negative_constraints.append(FactSchema(predicate="holding", arguments=("robot", obj_clean)))
@@ -271,9 +333,37 @@ class DomainRouter:
                 cell_id = loc_clean if loc_clean.startswith("cell_") or loc_clean.startswith("loc_") else f"cell_{loc_clean}"
                 entities[cell_id] = "location"
                 negative_constraints.append(FactSchema(predicate="at", arguments=("agent", cell_id)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_TRANSITION,
+                        action_name="move",
+                        to_entity=cell_id,
+                        arg_index=2,
+                        description=f"Do not enter {cell_id}",
+                        source_text=text,
+                    )
+                )
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="at", arguments=("agent", cell_id)),
+                        description=f"State at(agent, {cell_id}) forbidden",
+                        source_text=text,
+                    )
+                )
             elif domain_id in ("household", "household_robotics"):
                 entities[loc_clean] = "room"
                 negative_constraints.append(FactSchema(predicate="robot_at", arguments=("robot", loc_clean)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_TRANSITION,
+                        action_name="move",
+                        to_entity=loc_clean,
+                        arg_index=2,
+                        description=f"Do not move robot to {loc_clean}",
+                        source_text=text,
+                    )
+                )
             elif domain_id == "warehouse":
                 zone_id = loc_clean if loc_clean.startswith("zone_") else f"zone_{loc_clean}"
                 entities[zone_id] = "zone"
@@ -296,6 +386,24 @@ class DomainRouter:
                 )
                 entities[pkg_id] = "artifact"
                 negative_constraints.append(FactSchema(predicate="deployed_to", arguments=(pkg_id, env_clean)))
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_ACTION_BINDING,
+                        action_name="deploy",
+                        entity=env_clean,
+                        arg_index=1,
+                        description=f"Do not deploy to {env_clean}",
+                        source_text=text,
+                    )
+                )
+                typed_constraints.append(
+                    TaskConstraintSchema(
+                        constraint_type=TaskConstraintType.FORBID_STATE_FACT,
+                        state_fact=FactSchema(predicate="deployed_to", arguments=(pkg_id, env_clean)),
+                        description=f"State deployed_to({pkg_id}, {env_clean}) forbidden",
+                        source_text=text,
+                    )
+                )
 
         # Pattern 5: Prohibited scheduling / assignment ("do not schedule/assign X to Y")
         sched_prohibitions = re.findall(

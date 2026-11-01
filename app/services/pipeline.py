@@ -373,6 +373,13 @@ class PipelineOrchestrator:
                 proposal = self.llm_provider.interpret(prompt, active_domain)
                 provider_name = "mock_fallback"
 
+            # Merge routing-derived typed and negative constraints if interpreter did not populate them
+            if 'routing' in locals() and routing:
+                if getattr(routing, "typed_constraints", None) and not getattr(proposal, "typed_constraints", []):
+                    proposal.typed_constraints = list(routing.typed_constraints)
+                if getattr(routing, "negative_constraints", None) and not getattr(proposal, "negative_constraints", []):
+                    proposal.negative_constraints = list(routing.negative_constraints)
+
             # Optional Vision perception integration
             if image is not None:
                 scene_proposal = self.vision_detector.detect(image)
@@ -443,6 +450,37 @@ class PipelineOrchestrator:
 
             # ─── Stage 3: PLAN (with cascade) ─────────────────────────
             problem = self.validator.convert_to_problem(proposal, active_domain)
+
+            # Fail-closed invariant validation on the initial state before search
+            ok_init, err_init = problem.check_invariants(problem.initial_state)
+            if not ok_init:
+                elapsed = (time.perf_counter() - start_time) * 1000.0
+                verif_err = VerificationResultSchema(
+                    is_valid=False,
+                    failed_step_index=0,
+                    explanation=f"Initial state violates invariants: {err_init}",
+                )
+                return PipelineExecutionResult(
+                    task_id=proposal.task_id,
+                    raw_prompt=prompt,
+                    status="INVARIANT_VIOLATION",
+                    domain_id=routed_domain_id,
+                    has_image=(image is not None),
+                    interpretation=proposal,
+                    validation=ProposalValidationResult(
+                        status=ValidationStatus.CONTRADICTION,
+                        is_valid=False,
+                        errors=[f"Initial state invariant violation: {err_init}"],
+                        validated_proposal=None,
+                    ),
+                    symbolic_problem_name="initial_state_invariant_violation",
+                    planner_algorithm=algorithm,
+                    candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=err_init),
+                    initial_verification=verif_err,
+                    final_verification=verif_err,
+                    total_execution_time_ms=elapsed,
+                    decision_trace=trace,
+                )
 
             # Build planner cascade: start with requested algorithm, then add others
             cascade = [algorithm]

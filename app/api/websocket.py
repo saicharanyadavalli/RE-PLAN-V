@@ -160,6 +160,13 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                     recovery_action="mock_fallback",
                 ))
 
+            # Merge routing-derived constraints if interpreter did not populate them
+            if 'routing' in locals() and routing:
+                if getattr(routing, "typed_constraints", None) and not getattr(proposal, "typed_constraints", []):
+                    proposal.typed_constraints = list(routing.typed_constraints)
+                if getattr(routing, "negative_constraints", None) and not getattr(proposal, "negative_constraints", []):
+                    proposal.negative_constraints = list(routing.negative_constraints)
+
             # ─── Stage 2: Validation ──────────────────────────────────
             t1 = time.perf_counter()
             val_res = orchestrator.validator.validate(proposal, target_domain)
@@ -172,6 +179,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                     "goal_facts": [f.model_dump() for f in proposal.goal_facts],
                     "initial_facts": [f.model_dump() for f in proposal.initial_facts],
                     "negative_constraints": [f.model_dump() for f in proposal.negative_constraints],
+                    "typed_constraints": [tc.model_dump() for tc in getattr(proposal, "typed_constraints", [])],
                     "is_valid": val_res.is_valid,
                     "provider_used": provider_name,
                     "stage_duration_ms": round(t_interp_ms, 2),
@@ -194,46 +202,73 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
             # ─── Stage 3: Planning (with cascade) ─────────────────────
             problem = orchestrator.validator.convert_to_problem(proposal, target_domain)
 
+            # Fail-closed check: validate initial state invariants
+            init_ok, init_err = problem.check_invariants(problem.initial_state)
+            if not init_ok:
+                await emit("INITIAL_STATE_INVARIANT_VIOLATION", f"Initial state violates invariants: {init_err}", {
+                    "error": init_err,
+                })
+
             # ─── Stage 2.5: Model B Complete Reachable-State Graph Enumeration
             if req.get("enumerate_graph", True):
                 await emit("GRAPH_ENUMERATION_STARTED", "Enumerating complete reachable state space (Model B)...")
                 try:
                     from core.graph.enumerator import CompleteReachableGraphEnumerator
-                    max_nodes = int(req.get("max_nodes", 250))
-                    max_edges = int(req.get("max_edges", 800))
-                    graph_timeout = float(req.get("graph_timeout", 3.0))
-                    enumerator = CompleteReachableGraphEnumerator(
-                        max_nodes=max_nodes,
-                        max_edges=max_edges,
-                        timeout_seconds=graph_timeout,
+                    from core.graph.resource_limits import GraphBudgetConfig, graph_concurrency_manager
+
+                    raw_nodes = req.get("max_nodes", 250)
+                    raw_edges = req.get("max_edges", 800)
+                    raw_timeout = req.get("graph_timeout", req.get("timeout_seconds", 3.0))
+
+                    budget = GraphBudgetConfig(
+                        max_nodes=raw_nodes,
+                        max_edges=raw_edges,
+                        timeout_seconds=raw_timeout,
                     )
-                    graph = enumerator.enumerate_graph(problem, target_domain)
 
-                    # Stream nodes in batches of 30 to avoid socket flooding
-                    node_list = list(graph.nodes.values())
-                    batch_size = 30
-                    for i in range(0, len(node_list), batch_size):
-                        batch = [n.model_dump() for n in node_list[i : i + batch_size]]
-                        await emit("GRAPH_NODE_BATCH", f"Streamed {len(batch)} reachable states...", {"nodes": batch, "offset": i, "total": len(node_list)})
+                    if not graph_concurrency_manager.acquire():
+                        await emit("GRAPH_ENUMERATION_TRUNCATED", "Graph enumeration skipped: server concurrency capacity exceeded.", {
+                            "truncation_reason": "CONCURRENCY_CAPACITY_EXCEEDED"
+                        })
+                    else:
+                        try:
+                            enumerator = CompleteReachableGraphEnumerator(
+                                max_nodes=budget.max_nodes,
+                                max_edges=budget.max_edges,
+                                timeout_seconds=budget.timeout_seconds,
+                            )
+                            graph = await asyncio.to_thread(enumerator.enumerate_graph, problem, target_domain)
+                        finally:
+                            graph_concurrency_manager.release()
 
-                    # Stream edges in batches of 50
-                    edge_list = graph.edges
-                    edge_batch_size = 50
-                    for i in range(0, len(edge_list), edge_batch_size):
-                        batch = [e.model_dump() for e in edge_list[i : i + edge_batch_size]]
-                        await emit("GRAPH_EDGE_BATCH", f"Streamed {len(batch)} valid transitions...", {"edges": batch, "offset": i, "total": len(edge_list)})
+                        # Stream nodes in batches of 30 to avoid socket flooding
+                        node_list = list(graph.nodes.values())
+                        batch_size = 30
+                        for i in range(0, len(node_list), batch_size):
+                            batch = [n.model_dump() for n in node_list[i : i + batch_size]]
+                            await emit("GRAPH_NODE_BATCH", f"Streamed {len(batch)} reachable states...", {"nodes": batch, "offset": i, "total": len(node_list)})
 
-                    graph_stage = "GRAPH_ENUMERATION_COMPLETED" if graph.stats.is_complete else "GRAPH_ENUMERATION_TRUNCATED"
-                    status_msg = f"Reachable graph complete ({graph.stats.total_nodes} states, {graph.stats.total_edges} transitions)." if graph.stats.is_complete else f"Reachable graph truncated ({graph.stats.truncation_reason}): {graph.stats.total_nodes} states explored."
-                    await emit(graph_stage, status_msg, {
-                        "stats": graph.stats.model_dump(),
-                        "is_complete": graph.stats.is_complete,
-                        "truncation_reason": graph.stats.truncation_reason,
-                        "goal_count": len(graph.stats.goal_node_ids),
-                        "dead_end_count": len(graph.stats.dead_end_node_ids),
-                    })
+                        # Stream edges in batches of 50
+                        edge_list = graph.edges
+                        edge_batch_size = 50
+                        for i in range(0, len(edge_list), edge_batch_size):
+                            batch = [e.model_dump() for e in edge_list[i : i + edge_batch_size]]
+                            await emit("GRAPH_EDGE_BATCH", f"Streamed {len(batch)} valid transitions...", {"edges": batch, "offset": i, "total": len(edge_list)})
+
+                        graph_stage = "GRAPH_ENUMERATION_COMPLETED" if graph.stats.is_complete else "GRAPH_ENUMERATION_TRUNCATED"
+                        status_msg = f"Reachable graph complete ({graph.stats.total_nodes} states, {graph.stats.total_edges} transitions)." if graph.stats.is_complete else f"Reachable graph truncated ({graph.stats.truncation_reason}): {graph.stats.total_nodes} states explored."
+                        await emit(graph_stage, status_msg, {
+                            "stats": graph.stats.model_dump(),
+                            "is_complete": graph.stats.is_complete,
+                            "truncation_reason": graph.stats.truncation_reason,
+                            "goal_count": len(graph.stats.goal_node_ids),
+                            "dead_end_count": len(graph.stats.dead_end_node_ids),
+                        })
                 except Exception as ex:
                     logger.warning(f"Graph enumeration streaming warning: {ex}")
+                    await emit("GRAPH_ENUMERATION_TRUNCATED", f"Graph enumeration failed: {str(ex)}", {
+                        "truncation_reason": f"ERROR: {str(ex)}"
+                    })
 
             cascade = [algorithm]
             for alt in PLANNER_CASCADE:

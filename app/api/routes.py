@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.services.pipeline import PipelineExecutionResult, PipelineOrchestrator
+from app.services.problem_builder import ValidatedProblemBuilder
+from core.graph.resource_limits import GraphBudgetLimits, graph_concurrency_manager
 from evaluation.experiments.runner import ExperimentRunner
 
 router = APIRouter(prefix="/api")
@@ -119,65 +122,83 @@ def get_domain_details(domain_id: str) -> Dict[str, Any]:
 class GraphEnumerateRequest(BaseModel):
     domain_id: str = "blocks_world"
     prompt: Optional[str] = "Stack the red box on the blue box."
-    max_nodes: int = Field(default=300, ge=1)
-    max_edges: int = Field(default=1000, ge=1)
-    timeout_seconds: float = Field(default=5.0, gt=0.0)
+    max_nodes: int = Field(default=300, ge=GraphBudgetLimits.MIN_NODES, le=GraphBudgetLimits.MAX_NODES)
+    max_edges: int = Field(default=1000, ge=GraphBudgetLimits.MIN_EDGES, le=GraphBudgetLimits.MAX_EDGES)
+    timeout_seconds: float = Field(default=5.0, ge=GraphBudgetLimits.MIN_TIMEOUT_SECONDS, le=GraphBudgetLimits.MAX_TIMEOUT_SECONDS)
+
+    @field_validator("max_nodes", "max_edges", mode="before")
+    @classmethod
+    def reject_bool_and_non_int(cls, v: Any) -> int:
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise ValueError("Must be a strict integer")
+        return v
+
+    @field_validator("timeout_seconds", mode="before")
+    @classmethod
+    def validate_timeout(cls, v: Any) -> float:
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError("Must be a float or integer")
+        val = float(v)
+        if math.isnan(val) or math.isinf(val):
+            raise ValueError("Must not be NaN or Inf")
+        return val
 
 
 @router.post("/graph/enumerate")
 def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
-    """Model B: Computes the complete reachable state-space graph."""
+    """Model B: Computes the complete reachable state-space graph using authoritative ValidatedProblemBuilder."""
     from core.domains import registry
     from core.graph.enumerator import CompleteReachableGraphEnumerator
-    from core.world.predicates import Fact
-    from core.world.problem import SymbolicProblem
-    from core.world.state import SymbolicState
-    from core.world.types import ObjectRegistry
-    from interpretation.router import DomainRouter, RoutingOutcome
+    from interpretation.router import RoutingOutcome
 
-    router = DomainRouter(registry=registry)
-    routing = router.route(
-        req.prompt or "Stack the red box on the blue box.",
-        explicit_domain_id=req.domain_id if req.domain_id != "auto" else None,
+    # Explicit domain check for 404 compliance
+    if req.domain_id != "auto" and not registry.get(req.domain_id):
+        raise HTTPException(status_code=404, detail=f"Domain '{req.domain_id}' not found.")
+
+    builder = ValidatedProblemBuilder(registry=registry)
+    build_res = builder.build_problem(
+        prompt=req.prompt or "Stack the red box on the blue box.",
+        domain_id=req.domain_id if req.domain_id != "auto" else None,
+        problem_name=f"{req.domain_id}_task",
     )
-    if routing.outcome != RoutingOutcome.SUPPORTED:
+
+    if not build_res.is_success or build_res.problem is None or build_res.domain is None:
+        if build_res.outcome == RoutingOutcome.NEEDS_CLARIFICATION:
+            return {
+                "status": "NEEDS_CLARIFICATION",
+                "clarification_question": build_res.clarification_question,
+                "explanation": build_res.error_message,
+                "elements": [],
+            }
+        if build_res.status == "INVARIANT_VIOLATION":
+            return {
+                "status": "INVARIANT_VIOLATION",
+                "explanation": build_res.error_message,
+                "elements": [],
+            }
         return {
-            "status": routing.outcome.value,
-            "clarification_question": routing.clarification_question,
-            "explanation": routing.explanation,
+            "status": build_res.outcome.value if build_res.outcome else (build_res.status or "UNSUPPORTED"),
+            "clarification_question": build_res.clarification_question,
+            "explanation": build_res.error_message,
             "elements": [],
         }
 
-    target_domain_id = req.domain_id if req.domain_id != "auto" else routing.selected_domain_id
-    domain = registry.get(target_domain_id)
-    if not domain:
-        raise HTTPException(status_code=404, detail=f"Domain '{target_domain_id}' not found.")
-
-    reg = ObjectRegistry(domain.type_hierarchy)
-    for obj_name, obj_type in routing.entities.items():
-        reg.register_object(obj_name, obj_type)
-
-    s0 = SymbolicState([
-        Fact(f.predicate, list(f.arguments)) for f in routing.initial_facts
-    ])
-    goals = [
-        Fact(f.predicate, list(f.arguments)) for f in routing.goal_facts
-    ]
-    problem = SymbolicProblem(
-        name=f"{domain.domain_id}_task",
-        domain_name=domain.domain_id,
-        registry=reg,
-        initial_state=s0,
-        goal_conditions=goals,
-    )
-
-    enumerator = CompleteReachableGraphEnumerator(
-        max_nodes=req.max_nodes,
-        max_edges=req.max_edges,
-        timeout_seconds=req.timeout_seconds,
-    )
-    graph = enumerator.enumerate_graph(problem, domain)
-    return graph.to_cytoscape()
+    # Strict bounded concurrency for graph exploration
+    if not graph_concurrency_manager.acquire():
+        raise HTTPException(
+            status_code=429,
+            detail=f"Graph enumeration capacity exceeded (max {graph_concurrency_manager.max_concurrent} concurrent). Try again later.",
+        )
+    try:
+        enumerator = CompleteReachableGraphEnumerator(
+            max_nodes=req.max_nodes,
+            max_edges=req.max_edges,
+            timeout_seconds=req.timeout_seconds,
+        )
+        graph = enumerator.enumerate_graph(build_res.problem, build_res.domain)
+        return graph.to_cytoscape()
+    finally:
+        graph_concurrency_manager.release()
 
 
 class FormalizeRequest(BaseModel):

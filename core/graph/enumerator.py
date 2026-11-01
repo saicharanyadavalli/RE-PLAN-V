@@ -8,12 +8,14 @@ and strict resource budgets.
 from __future__ import annotations
 
 import collections
+import math
 import time
 import uuid
 from typing import Dict, List, Optional, Set, Tuple
 
 from core.domains.base import BaseDomain
 from core.graph.models import GraphEdge, GraphNode, GraphStats, ReachableStateGraph
+from core.graph.resource_limits import GraphBudgetLimits
 from core.world.problem import SymbolicProblem
 from core.world.state import SymbolicState
 
@@ -27,9 +29,32 @@ class CompleteReachableGraphEnumerator:
         max_edges: int = 1500,
         timeout_seconds: float = 5.0,
     ) -> None:
+        if isinstance(max_nodes, bool) or not isinstance(max_nodes, int):
+            raise ValueError(f"max_nodes must be an integer, got {type(max_nodes).__name__}")
+        if not (GraphBudgetLimits.MIN_NODES <= max_nodes <= GraphBudgetLimits.MAX_CORE_NODES):
+            raise ValueError(
+                f"max_nodes {max_nodes} out of bounds [{GraphBudgetLimits.MIN_NODES}, {GraphBudgetLimits.MAX_CORE_NODES}]"
+            )
+
+        if isinstance(max_edges, bool) or not isinstance(max_edges, int):
+            raise ValueError(f"max_edges must be an integer, got {type(max_edges).__name__}")
+        if not (GraphBudgetLimits.MIN_EDGES <= max_edges <= GraphBudgetLimits.MAX_CORE_EDGES):
+            raise ValueError(
+                f"max_edges {max_edges} out of bounds [{GraphBudgetLimits.MIN_EDGES}, {GraphBudgetLimits.MAX_CORE_EDGES}]"
+            )
+
+        if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
+            raise ValueError(f"timeout_seconds must be a number, got {type(timeout_seconds).__name__}")
+        if math.isnan(timeout_seconds) or math.isinf(timeout_seconds):
+            raise ValueError("timeout_seconds cannot be NaN or Infinite")
+        if not (GraphBudgetLimits.MIN_TIMEOUT_SECONDS <= timeout_seconds <= GraphBudgetLimits.MAX_CORE_TIMEOUT):
+            raise ValueError(
+                f"timeout_seconds {timeout_seconds} out of bounds [{GraphBudgetLimits.MIN_TIMEOUT_SECONDS}, {GraphBudgetLimits.MAX_CORE_TIMEOUT}]"
+            )
+
         self.max_nodes = max_nodes
         self.max_edges = max_edges
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = float(timeout_seconds)
 
     def enumerate_graph(
         self, problem: SymbolicProblem, domain: BaseDomain
@@ -40,6 +65,55 @@ class CompleteReachableGraphEnumerator:
 
         init_state = problem.initial_state
         init_id = domain.canonical_state_key(init_state)
+
+        # Fail-closed invariant validation on the initial state before node creation
+        ok_d_init, err_d_init = domain.check_invariants(init_state)
+        if not ok_d_init:
+            stats = GraphStats(
+                total_nodes=0,
+                total_edges=0,
+                initial_node_id=init_id,
+                goal_node_ids=[],
+                dead_end_node_ids=[],
+                max_depth=0,
+                is_complete=False,
+                truncation_reason=f"INITIAL_STATE_INVARIANT_VIOLATION: {err_d_init}",
+                enumeration_time_ms=(time.perf_counter() - start_time) * 1000.0,
+                duplicate_states_pruned=0,
+                cycles_detected=0,
+            )
+            return ReachableStateGraph(
+                graph_id=graph_id,
+                domain_id=domain.domain_id,
+                problem_name=problem.name,
+                nodes={},
+                edges=[],
+                stats=stats,
+            )
+
+        ok_p_init, err_p_init = problem.check_invariants(init_state)
+        if not ok_p_init:
+            stats = GraphStats(
+                total_nodes=0,
+                total_edges=0,
+                initial_node_id=init_id,
+                goal_node_ids=[],
+                dead_end_node_ids=[],
+                max_depth=0,
+                is_complete=False,
+                truncation_reason=f"INITIAL_STATE_INVARIANT_VIOLATION: {err_p_init}",
+                enumeration_time_ms=(time.perf_counter() - start_time) * 1000.0,
+                duplicate_states_pruned=0,
+                cycles_detected=0,
+            )
+            return ReachableStateGraph(
+                graph_id=graph_id,
+                domain_id=domain.domain_id,
+                problem_name=problem.name,
+                nodes={},
+                edges=[],
+                stats=stats,
+            )
 
         nodes: Dict[str, GraphNode] = {}
         edges: List[GraphEdge] = []

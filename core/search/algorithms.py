@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import collections
 import heapq
+import math
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
@@ -271,6 +272,11 @@ class BestFirstPlanner(BasePlanner):
 
             applicable = action_gen.get_applicable_actions(curr_node.state)
             for act in applicable:
+                if act.cost < 0.0 or not math.isfinite(act.cost):
+                    raise ValueError(
+                        f"Action '{act.name}' has invalid negative or non-finite cost {act.cost}. "
+                        "A* optimality requires non-negative action costs."
+                    )
                 if act in forbidden:
                     continue
                 if prune_action_callback and prune_action_callback(curr_node.state, act):
@@ -405,6 +411,11 @@ class AStarPlanner(BasePlanner):
 
             applicable = action_gen.get_applicable_actions(curr_node.state)
             for act in applicable:
+                if act.cost < 0.0 or not math.isfinite(act.cost):
+                    raise ValueError(
+                        f"Action '{act.name}' has invalid negative or non-finite cost {act.cost}. "
+                        "A* optimality requires non-negative action costs."
+                    )
                 if act in forbidden:
                     continue
                 if prune_action_callback and prune_action_callback(curr_node.state, act):

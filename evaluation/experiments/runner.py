@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -72,19 +73,21 @@ class ExperimentRunner:
             # 3. Run B2 (Reject without repair)
             r2 = b2_runner.run(inst, domain, initial_candidate=invalid_candidate)
             r2["initial_plan_was_invalid"] = True
-            r2["repair_time_ms"] = 0.0
+            r2["repair_time_ms"] = None
             b2_collector.record_run(r2)
 
             # 4. Run B3 (Generic Regeneration)
             r3 = b3_runner.run(inst, domain, initial_candidate=invalid_candidate, max_attempts=3)
             r3["initial_plan_was_invalid"] = True
-            r3["repair_time_ms"] = r3.get("planning_time_ms", 0.0)
+            # Keep isolated pure_repair_time_ms reported by runner
+            r3["repair_time_ms"] = r3.get("repair_time_ms", 0.0)
             b3_collector.record_run(r3)
 
             # 5. Run OURS (Counterexample-Guided Repair)
             r_ours = ours_runner.run(inst, domain, initial_candidate=invalid_candidate)
             r_ours["initial_plan_was_invalid"] = True
-            r_ours["repair_time_ms"] = r_ours.get("planning_time_ms", 0.0)
+            # Keep isolated pure_repair_time_ms reported by runner
+            r_ours["repair_time_ms"] = r_ours.get("repair_time_ms", 0.0)
             pred_attr = r_ours.get("attribution")
             pred_class = getattr(pred_attr, "fault_class", None) if pred_attr else None
             # Injected fault was an invalid stack action without picking up, which is a PLANNING_ERROR
@@ -108,6 +111,13 @@ class ExperimentRunner:
 
         results = {
             "experiment": "Primary Research Question: Counterexample-Guided Repair vs Generic Regeneration",
+            "provenance": {
+                "dataset": "Controlled synthetic blocks_world pilot instances",
+                "is_pilot": True,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "num_instances": num_instances,
+                "seed": seed,
+            },
             "num_instances": num_instances,
             "seed": seed,
             "recovery_advantage": recovery_advantage,
