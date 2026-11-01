@@ -1,9 +1,9 @@
 # RE-PLAN-V: Post-Integration Defect Register (Final Closeout)
 
 - **Audit Date**: November 2026
-- **Audited Commit**: `4e908f4d8ec12981720e08cbff2d81c3986d03e2` (Baseline) -> `7a40579` (Stage 11 Verified Main)
+- **Audited Commit Lineage**: `4e908f4d8` (Baseline) -> `7a40579` (Stage 11 Core Implementation) -> `47de162` (Delivery Sign-Off) -> `dfa0de0` (Audit SHA Reconciliation) -> `2ee4f1f` (Evaluation Refresh) -> Final Closeout Integrated on `main`
 - **Classification Taxonomy**: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
-- **Status Taxonomy**: `VERIFIED_CLOSED` (All 11 Defects Remediated & Verified)
+- **Status Taxonomy**: `VERIFIED_CLOSED` (All 37 Defects Remediated & Verified)
 
 ---
 
@@ -58,11 +58,26 @@
 
 ---
 
+## Final Closeout Defect Remediation Matrix (Findings A through G)
+
+| Defect ID | Severity | Final Status | Module / File Path | Description | Remediation & Verification Evidence | Target Milestone |
+|:---|:---|:---|:---|:---|:---|:---|
+| **FIND-A** | `CRITICAL` | `VERIFIED_CLOSED` | `app/services/pipeline.py`, `app/api/websocket.py` | Shared problem builder claim contradicted source code: `pipeline.py` and `websocket.py` bypassed `ValidatedProblemBuilder` and called validator conversion directly. | Refactored `PipelineOrchestrator` and `handle_websocket_pipeline` to use `ValidatedProblemBuilder.build_from_proposal` as the unified problem-construction path. Verified by `tests/integration/test_final_closeout_builder_parity.py`. | **Final Closeout** |
+| **FIND-B** | `CRITICAL` | `VERIFIED_CLOSED` | `app/api/websocket.py` | WebSocket handler emitted `INITIAL_STATE_INVARIANT_VIOLATION` event upon invalid initial state but failed to return, continuing to graph enumeration and planning. | Added fail-closed early return in `handle_websocket_pipeline` upon invariant failure, strictly terminating request processing. Verified by `tests/integration/test_final_closeout_websocket_fail_closed.py`. | **Final Closeout** |
+| **FIND-C** | `HIGH` | `VERIFIED_CLOSED` | `evaluation/ablations/configurations.py` | Ablation repair time was aliased to total planning time (`res["repair_time_ms"] = res.get("planning_time_ms")`), and attribution correctness was hardcoded to `True` for `full`. | Corrected ablation runner to use `pure_repair_time_ms`, set `repair_attempted = False` and `repair_time_ms = None` for non-repair variants, and evaluated attribution against ground truth `PLANNING_ERROR`. Verified by `tests/unit/test_final_closeout_ablation_metrics.py`. | **Final Closeout** |
+| **FIND-D** | `MEDIUM` | `VERIFIED_CLOSED` | `RESEARCH_REPORT.md` | Research report cited older isolated repair latency (18.42 ms) instead of freshly generated reproduction benchmark on controlled pilot data. | Calibrated latency figures and added explicit explanatory note stating that `pure_repair_time_ms` is measured on controlled synthetic pilot data ($N=10$, seed 42). | **Final Closeout** |
+| **FIND-E** | `MEDIUM` | `VERIFIED_CLOSED` | `docs/engineering/*.md` | Engineering documents had disjoint commit SHA references (`47de162`, `7a40579` vs remote `2ee4f1f`). | Reconciled engineering reports to document exact commit lineage: `7a40579` (implementation), `47de162` (delivery), `dfa0de0` (audit), and `2ee4f1f` (eval refresh), plus closeout fixes on `main`. | **Final Closeout** |
+| **FIND-F** | `LOW` | `VERIFIED_CLOSED` | `README.md` | `README.md` claimed "87%+ overall coverage" without checked-in verified coverage artifact. | Removed unsupported coverage percentage claim, reporting verified test pass rate and test counts. | **Final Closeout** |
+| **FIND-G** | `MEDIUM` | `VERIFIED_CLOSED` | `README.md`, `docs/engineering/*.md` | Release status was overstated as a deployed production service without live deployment evidence. | Updated release status to `RESEARCH_PROTOTYPE_VERIFIED` to accurately reflect a verified algorithmic research prototype. | **Final Closeout** |
+
+---
+
 ## Verification Summary
 - **Total Defects Identified (Stage 0 - Stage 9)**: 11 (100% Remediated)
 - **Total Remaining Defects Remediated (Stage 10)**: 11 (100% Remediated)
 - **Total Final Defects Remediated (Stage 11)**: 8 (100% Remediated)
-- **Cumulative Defect Closeout**: 30 / 30 Defects `VERIFIED_CLOSED` (100%)
-- **Total Backend Regression Suite**: 455 passing tests in `pytest` (0 failures, 2 warnings across 46 test modules).
+- **Total Closeout Findings Remediated (Findings A - G)**: 7 (100% Remediated)
+- **Cumulative Defect Closeout**: 37 / 37 Defects `VERIFIED_CLOSED` (100%)
+- **Total Backend Regression Suite**: 476 passing tests in `pytest` (0 failures, 2 warnings across 50 test modules, 100% pass rate).
 - **Benchmark Reproduction**: `python scripts/reproduce_results.py` confirms 100% execution integrity and zero fabricated metrics.
 - **Frontend Production Build**: `npm --prefix frontend run build` clean (exit code 0).

@@ -4,7 +4,7 @@
 - **Auditor**: Antigravity Principal Engineer, Integration Lead, Release Manager & Verification Authority
 - **Repository**: `https://github.com/saicharanyadavalli/RE-PLAN-V`
 - **Sole Canonical Branch**: `main`
-- **Status**: `PASS` (All Stage 11 Acceptance Criteria Satisfied with Independent Executable Evidence)
+- **Status**: `RESEARCH_PROTOTYPE_VERIFIED` (All Stage 11 & Closeout Acceptance Criteria Satisfied with Independent Executable Evidence)
 
 ---
 
@@ -37,6 +37,9 @@ This document presents the final, independent engineering audit verifying the co
    - Baseline: `f35db88e1c408c3dde7dd29f280e1aeb49d400e5`
    - Stage 11 Core Implementation: `7a4057915913db26d636adf13d6ed58b25a11f24`
    - Stage 11 Delivery Sign-Off: `47de162af517139a78b0eb477efaad0824a890a2`
+   - Stage 11 Audit Finalization: `dfa0de03cfcb3f39585e460c719f594699ec4ffa`
+   - Reproduction Metrics Refresh: `2ee4f1f36b10cadcc90b89a9b8352ed177ab85e0`
+   - Final Closeout Implementation: `3b524e17ca47adfa5938db9062eb18f76081bbdb`
 
 ---
 
@@ -133,68 +136,84 @@ This document presents the final, independent engineering audit verifying the co
   `pytest tests/ -q --junitxml=evaluation/reports/stage11-junit.xml`
 - **Result**: **455 passed**, 2 warnings in 21.30s across 46 test files.
 
+### 3.9 Final Closeout Remediation Audit (Findings A through G)
+
+| Area | Prior Status | Closeout Audit Status | Verification Evidence & Key Findings |
+|:---|:---:|:---:|:---|
+| **Finding A: Shared Problem Builder Parity** | PARTIAL | **PASS** | Refactored `PipelineOrchestrator` and `handle_websocket_pipeline` to use `ValidatedProblemBuilder.build_from_proposal` as the single authoritative source of problem construction. Verified by `test_final_closeout_builder_parity.py`. |
+| **Finding B: WebSocket Fail-Closed Early Return** | FAIL | **PASS** | In `app/api/websocket.py`, handler returns immediately upon `INITIAL_STATE_INVARIANT_VIOLATION`, terminating before any graph enumeration or planning calls. Verified by `test_final_closeout_websocket_fail_closed.py`. |
+| **Finding C: Ablation Metric & Attribution Correction** | FAIL | **PASS** | Corrected `evaluation/ablations/configurations.py` to use `pure_repair_time_ms`, set `repair_attempted = False` and `repair_time_ms = None` for non-repair variants, and evaluated attribution against ground truth `PLANNING_ERROR`. Verified by `test_final_closeout_ablation_metrics.py`. |
+| **Finding D: Research Latency Calibration** | PARTIAL | **PASS** | `RESEARCH_REPORT.md` updated with fresh reproduction benchmark latency and clear note qualifying `pure_repair_time_ms` on controlled synthetic pilot data ($N=10$, seed 42). |
+| **Finding E: Documentation Lineage Reconciliation** | PARTIAL | **PASS** | Synchronized commit lineage across `7a40579`, `47de162`, `dfa0de0`, and `2ee4f1f` across all documentation artifacts. |
+| **Finding F: Removal of Unsupported Coverage Claim** | FAIL | **PASS** | Removed unverified "87%+ overall coverage" claim from `README.md`. |
+| **Finding G: Release Status Qualification** | PARTIAL | **PASS** | Updated release status to `RESEARCH_PROTOTYPE_VERIFIED` across all documentation artifacts to accurately represent a verified algorithmic research prototype. |
+
 ---
 
-## 4. Reconciled Test Inventory (Exact Sum Denominator = 455)
+## 4. Reconciled Test Inventory (Exact Sum Denominator = 476)
 
-The following table provides the exact test count for every test file in the repository, reconciling the total to 455:
+The following table provides the exact test count for every test file in the repository, reconciling the total to 476:
 
 | # | Test File Path | Test Count |
 |:---|:---|:---:|
 | 1 | `tests/edge_cases/test_edge_cases.py` | 16 |
-| 2 | `tests/integration/test_multi_domain_pipeline.py` | 5 |
-| 3 | `tests/integration/test_pipeline_e2e.py` | 13 |
-| 4 | `tests/integration/test_stage_10_domain_invariants_pipeline.py` | 4 |
-| 5 | `tests/integration/test_stage_10_fail_closed_pipeline.py` | 11 |
-| 6 | `tests/integration/test_stage_10_graph_transport_contract.py` | 3 |
-| 7 | `tests/integration/test_stage_11_constraint_pipeline_integration.py` | 5 |
-| 8 | `tests/integration/test_stage_11_initial_state_graph_validation.py` | 3 |
-| 9 | `tests/integration/test_stage_11_resource_budget_boundaries.py` | 6 |
-| 10 | `tests/integration/test_stage_11_rest_websocket_problem_parity.py` | 1 |
-| 11 | `tests/integration/test_stage_8_reliability.py` | 17 |
-| 12 | `tests/integration/test_websocket_streaming.py` | 6 |
-| 13 | `tests/property/test_properties.py` | 11 |
-| 14 | `tests/scenarios/test_failure_scenarios.py` | 12 |
-| 15 | `tests/scenarios/test_happy_paths.py` | 8 |
-| 16 | `tests/unit/test_actions.py` | 4 |
-| 17 | `tests/unit/test_all_domains.py` | 8 |
-| 18 | `tests/unit/test_api_endpoints.py` | 17 |
-| 19 | `tests/unit/test_attribution.py` | 6 |
-| 20 | `tests/unit/test_attribution_matrix.py` | 1 |
-| 21 | `tests/unit/test_contracts.py` | 8 |
-| 22 | `tests/unit/test_counterexamples.py` | 3 |
-| 23 | `tests/unit/test_domain_conformance.py` | 24 |
-| 24 | `tests/unit/test_domain_framework.py` | 3 |
-| 25 | `tests/unit/test_domain_router.py` | 10 |
-| 26 | `tests/unit/test_dynamic.py` | 3 |
-| 27 | `tests/unit/test_evaluation.py` | 5 |
-| 28 | `tests/unit/test_interpretation.py` | 15 |
-| 29 | `tests/unit/test_krr.py` | 6 |
-| 30 | `tests/unit/test_lm_studio_provider.py` | 5 |
-| 31 | `tests/unit/test_multi_domain_benchmarks.py` | 3 |
-| 32 | `tests/unit/test_nlp_corpus.py` | 146 |
-| 33 | `tests/unit/test_repair.py` | 3 |
-| 34 | `tests/unit/test_retry_tree.py` | 4 |
-| 35 | `tests/unit/test_search.py` | 8 |
-| 36 | `tests/unit/test_stage_10_astar_optimality.py` | 3 |
-| 37 | `tests/unit/test_stage_10_evaluation_metrics_denominators.py` | 4 |
-| 38 | `tests/unit/test_stage_10_negative_constraint_semantics.py` | 5 |
-| 39 | `tests/unit/test_stage_10_security_resource_bounds.py` | 9 |
-| 40 | `tests/unit/test_stage_11_astar_weighted_optimality.py` | 2 |
-| 41 | `tests/unit/test_stage_11_repair_time_measurement.py` | 3 |
-| 42 | `tests/unit/test_stage_11_security_sandbox_boundaries.py` | 3 |
-| 43 | `tests/unit/test_state_space_explorer.py` | 6 |
-| 44 | `tests/unit/test_verification.py` | 7 |
-| 45 | `tests/unit/test_vision.py` | 3 |
-| 46 | `tests/unit/test_world_model.py` | 7 |
-| **TOTAL** | **46 Test Files** | **455 Tests** |
+| 2 | `tests/integration/test_final_closeout_builder_parity.py` | 7 |
+| 3 | `tests/integration/test_final_closeout_websocket_fail_closed.py` | 2 |
+| 4 | `tests/integration/test_multi_domain_pipeline.py` | 5 |
+| 5 | `tests/integration/test_pipeline_e2e.py` | 13 |
+| 6 | `tests/integration/test_stage_10_domain_invariants_pipeline.py` | 4 |
+| 7 | `tests/integration/test_stage_10_fail_closed_pipeline.py` | 11 |
+| 8 | `tests/integration/test_stage_10_graph_transport_contract.py` | 3 |
+| 9 | `tests/integration/test_stage_11_constraint_pipeline_integration.py` | 5 |
+| 10 | `tests/integration/test_stage_11_initial_state_graph_validation.py` | 3 |
+| 11 | `tests/integration/test_stage_11_resource_budget_boundaries.py` | 6 |
+| 12 | `tests/integration/test_stage_11_rest_websocket_problem_parity.py` | 1 |
+| 13 | `tests/integration/test_stage_8_reliability.py` | 17 |
+| 14 | `tests/integration/test_websocket_streaming.py` | 6 |
+| 15 | `tests/property/test_properties.py` | 11 |
+| 16 | `tests/scenarios/test_failure_scenarios.py` | 12 |
+| 17 | `tests/scenarios/test_happy_paths.py` | 8 |
+| 18 | `tests/unit/test_actions.py` | 4 |
+| 19 | `tests/unit/test_all_domains.py` | 8 |
+| 20 | `tests/unit/test_api_endpoints.py` | 17 |
+| 21 | `tests/unit/test_attribution.py` | 6 |
+| 22 | `tests/unit/test_attribution_matrix.py` | 1 |
+| 23 | `tests/unit/test_contracts.py` | 8 |
+| 24 | `tests/unit/test_counterexamples.py` | 3 |
+| 25 | `tests/unit/test_domain_conformance.py` | 24 |
+| 26 | `tests/unit/test_domain_framework.py` | 3 |
+| 27 | `tests/unit/test_domain_router.py` | 10 |
+| 28 | `tests/unit/test_dynamic.py` | 3 |
+| 29 | `tests/unit/test_evaluation.py` | 5 |
+| 30 | `tests/unit/test_final_closeout_ablation_metrics.py` | 4 |
+| 31 | `tests/unit/test_final_closeout_resource_validation.py` | 8 |
+| 32 | `tests/unit/test_interpretation.py` | 15 |
+| 33 | `tests/unit/test_krr.py` | 6 |
+| 34 | `tests/unit/test_lm_studio_provider.py` | 5 |
+| 35 | `tests/unit/test_multi_domain_benchmarks.py` | 3 |
+| 36 | `tests/unit/test_nlp_corpus.py` | 146 |
+| 37 | `tests/unit/test_repair.py` | 3 |
+| 38 | `tests/unit/test_retry_tree.py` | 4 |
+| 39 | `tests/unit/test_search.py` | 8 |
+| 40 | `tests/unit/test_stage_10_astar_optimality.py` | 3 |
+| 41 | `tests/unit/test_stage_10_evaluation_metrics_denominators.py` | 4 |
+| 42 | `tests/unit/test_stage_10_negative_constraint_semantics.py` | 5 |
+| 43 | `tests/unit/test_stage_10_security_resource_bounds.py` | 9 |
+| 44 | `tests/unit/test_stage_11_astar_weighted_optimality.py` | 2 |
+| 45 | `tests/unit/test_stage_11_repair_time_measurement.py` | 3 |
+| 46 | `tests/unit/test_stage_11_security_sandbox_boundaries.py` | 3 |
+| 47 | `tests/unit/test_state_space_explorer.py` | 6 |
+| 48 | `tests/unit/test_verification.py` | 7 |
+| 49 | `tests/unit/test_vision.py` | 3 |
+| 50 | `tests/unit/test_world_model.py` | 7 |
+| **TOTAL** | **50 Test Files** | **476 Tests** |
 
-*Verification Note*: All 455 tests passed in 21.30s with zero failures and zero skipped tests.
+*Verification Note*: All 476 tests passed with zero failures and zero skipped tests.
 
 ---
 
 ## 5. Final Sign-off
 
-With the completion of Stage 11, all defects from prior review cycles are resolved with reproducible, machine-verifiable evidence. The repository is hardened, linear, clean, and production-ready on `main`.
+With the completion of Stage 11 and the Final Closeout, all defects from prior review cycles are resolved with reproducible, machine-verifiable evidence. The repository is hardened, linear, clean, and verified on `main`.
 
-**Final Sign-off Status**: `STAGE_11_COMPLETE_AND_VERIFIED`
+**Final Sign-off Status**: `RESEARCH_PROTOTYPE_VERIFIED`

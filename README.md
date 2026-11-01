@@ -2,13 +2,15 @@
 
 [![Course](https://img.shields.io/badge/Course-CS%20F407%20Artificial%20Intelligence-indigo.svg)](VIVA_GUIDE.md)
 [![Category](https://img.shields.io/badge/Category-Appendix%20B%3A%20Cross--Area%20(Search%20+%20KRR%20+%20DL)-purple.svg)](VIVA_GUIDE.md)
+[![Status](https://img.shields.io/badge/Status-RESEARCH__PROTOTYPE__VERIFIED-blue.svg)](docs/engineering/FINAL_ENGINEERING_DELIVERY_REPORT.md)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.1%20App%20Router-black.svg)](frontend/)
 [![WebSocket](https://img.shields.io/badge/Streaming-Bidirectional%20WebSockets-teal.svg)](app/api/websocket.py)
-[![Tests](https://img.shields.io/badge/Tests-455%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-476%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Symbolic Core](https://img.shields.io/badge/Core-Symbolic--First%20Authoritative-success.svg)](core/)
-[![Zero-API Ready](https://img.shields.io/badge/Zero--API-100%25%20Offline%20Ready-emerald.svg)](core/)
+[![Zero-API Ready](https://img.shields.io/badge/Zero--API-Offline%20Ready%20(Symbolic%20Core)-emerald.svg)](core/)
 
+> **Release Status**: `RESEARCH_PROTOTYPE_VERIFIED` (Algorithmic neurosymbolic research prototype; not a deployed production cloud service).
 > **Research Question**: *"Can counterexample-guided fault attribution and automatic repair improve recovery from initially invalid plans compared with generic plan regeneration?"*  
 > **Controlled Pilot Finding**: **YES**. On the reproducible synthetic pilot test suite ($N=10$, seed=42), grounded counterexample-derived constraints achieve a **100.0% recovery rate** on initially invalid candidate plans compared to **50.0% recovery** for unguided generic plan regeneration, yielding a **+50.0% recovery advantage** with low millisecond pure repair latency.
 
@@ -37,7 +39,7 @@ The fundamental flaws of LLM-only planning include:
 - **Lack of State Transition Semantics:** LLMs predict next tokens probabilistically ($P(w_t \mid w_{<t})$); they do not track discrete predicate state transitions $\Gamma(S, a) = (S \setminus \text{Del}(a)) \cup \text{Add}(a)$.
 - **Precondition Hallucinations:** LLMs routinely attempt to pick up objects when the gripper is already full, stack non-existent blocks, or manipulate fragile objects.
 - **Flawed Self-Repair:** When an LLM generates a flawed plan and is prompted *"That failed, please fix it"*, it enters unguided stochastic drift, repeatedly regenerating invalid actions.
-- **Catastrophic Physical Risk:** In robotics and industrial automation, an unverified plan translates directly into physical motor commands, risking collision, hardware destruction, or human injury.
+- **Catastrophic Physical Risk:** In robotics and industrial automation, an unverified plan can translate directly into physical motor commands, risking collision, hardware destruction, or human injury. (RE-PLAN-V operates as a formal symbolic planning and verification system; it does not issue live motor commands to physical hardware).
 
 ### The RE-PLAN-V Solution
 RE-PLAN-V introduces an **asymmetric, symbolic-first neurosymbolic planning architecture**:
@@ -53,7 +55,7 @@ When defending this project in academic viva examinations (CS F407 / U407), the 
 | Subsystem | Academic Pillar | Custom Student Implementation | Codebase Path |
 | :--- | :--- | :--- | :--- |
 | **First-Order Logic Core** | KR&R | Robinson's MGU Unification, term substitution, occurs-check, Horn clause forward chaining | [`core/krr/`](core/krr/) |
-| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search (UCS baseline guaranteeing path-cost optimality under non-negative action costs), BFS, Best-First Search | [`core/search/`](core/search/) |
+| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search (configured with admissible `ZeroHeuristic`, functioning as uniform-cost search baseline / Dijkstra's algorithm guaranteeing path-cost optimality under non-negative action costs), BFS, Best-First Search | [`core/search/`](core/search/) |
 | **STRIPS Formal Verifier** | Formal Methods | Independent state transition checker, invariant validation, mutex detection, goal checking | [`core/verification/`](core/verification/) |
 | **Counterexample Generator** | Formal Diagnostics | Minimal failing sub-trace extraction, state projection, actionable witness creation | [`core/counterexamples/`](core/counterexamples/) |
 | **Fault Attribution Engine** | Diagnostic AI | 5-class evidence-based taxonomy (`PERCEPTION`, `FORMALIZATION`, `PLANNING`, `ENVIRONMENT`, `AMBIGUOUS`) | [`core/attribution/`](core/attribution/) |
@@ -212,7 +214,7 @@ python -m app.main --mode benchmark --instances 5 --seed 42
 # Execute full pytest suite with coverage
 pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app --cov-report=term-missing
 ```
-*Result:* **455 passing tests** across 46 test modules, **87%+ overall coverage**, 100% test pass rate.
+*Result:* **476 passing tests** across 50 test modules, 100% test pass rate.
 
 ---
 
@@ -226,7 +228,7 @@ pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app 
 6. **Evidence-Based Fault Attribution:** Classifies into 5 distinct categories (`PERCEPTION`, `FORMALIZATION`, `PLANNING`, `ENVIRONMENT_CHANGE`, `UNKNOWN_AMBIGUOUS`).
 7. **Targeted Symbolic Repair:** Injects formal negative pruning constraints into the search space rather than blind unguided regeneration.
 8. **Zero Fabricated Metrics:** Every metric in benchmarks and reports is directly measured from deterministic execution.
-9. **Zero-API Core Operation:** Completely functional and testable offline with zero required external network dependencies.
+9. **Zero-API Core Operation:** Completely functional and testable offline with zero required external network dependencies (symbolic core, search, verification, and repair run fully offline; live LLM providers have network dependencies).
 10. **Strict Bounded Loops:** Maximum repair iterations and loop detection guards guarantee termination and eliminate cycles.
 
 ---
@@ -275,7 +277,7 @@ Calibrated across all 6 STRIPS domains using authoritative Model B state-space e
 > Analytical bounds represent theoretical combinatorial state spaces. Measured values represent empirical Model B reachability graphs enumerated via forward BFS search under domain transition semantics. Truncated state spaces are empirical lower bounds resulting from budget limits.
 
 > [!IMPORTANT]
-> **Model-Relative Safety Notice**: All verification guarantees in RE-PLAN-V are strictly model-relative against the declared STRIPS domain models, typed schemas, and formal invariants. RE-PLAN-V is an algorithmic and neuro-symbolic research platform; it does not issue live motor commands or guarantee physical hardware safety.
+> **Model-Relative Safety Notice**: All verification guarantees in RE-PLAN-V are strictly model-relative against the declared STRIPS domain models, typed schemas, and formal invariants. RE-PLAN-V is an algorithmic and neuro-symbolic research prototype; it does not issue live motor commands or guarantee physical hardware safety.
 
 ---
 
@@ -283,7 +285,7 @@ Calibrated across all 6 STRIPS domains using authoritative Model B state-space e
 
 This project satisfies all requirements of **CS F407 / U407 Artificial Intelligence (Appendix B: Cross-Area Project)**:
 
-1. **Search & Heuristics:** Implementation of $A^*$ search with an admissible heuristic guaranteeing step-cost optimality ($h \equiv 0$ uniform-cost search baseline and Relaxed Planning Graph $h_{\max}$ heuristic).
+1. **Search & Heuristics:** Implementation of $A^*$ search with an admissible heuristic guaranteeing step-cost optimality ($A^*$ search configured with admissible `ZeroHeuristic`, functioning as uniform-cost search baseline guaranteeing path-cost optimality under non-negative action costs).
 2. **Knowledge Representation & Reasoning:** First-Order Logic terms, Robinson's MGU Unification with occurs-check, and Horn clause forward chaining.
 3. **Classical Planning:** Formal STRIPS operator definitions, precondition matching, state transition semantics, and invariant enforcement.
 4. **Deep Learning / Neural Systems:** LLM integration as a bounded, untrusted proposer supporting both local 2B models (Gemma 2 2B / Qwen 2.5) and cloud endpoints.

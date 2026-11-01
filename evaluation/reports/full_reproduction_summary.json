@@ -1,29 +1,29 @@
 {
-  "timestamp": 1793550038.932022,
-  "elapsed_seconds": 6.451197900001716,
+  "timestamp": 1793556093.3800294,
+  "elapsed_seconds": 6.9802670999997645,
   "primary_results": {
     "experiment": "Primary Research Question: Counterexample-Guided Repair vs Generic Regeneration",
     "provenance": {
       "dataset": "Controlled synthetic blocks_world pilot instances",
       "is_pilot": true,
-      "timestamp": "2026-11-01T16:20:34Z",
-      "num_instances": 10,
-      "seed": 42
+      "timestamp": "2026-11-01T18:01:26Z",
+      "num_instances": 2,
+      "seed": 123
     },
-    "num_instances": 10,
-    "seed": 42,
-    "recovery_advantage": 0.5,
+    "num_instances": 2,
+    "seed": 123,
+    "recovery_advantage": 0.0,
     "summary": {
       "B0_DirectNeural": {
         "experiment_id": "B0_DirectNeural",
-        "total_instances": 10,
+        "total_instances": 2,
         "valid_plan_rate": 0.0,
         "goal_success_rate": 0.0,
         "constraint_violation_rate": 1.0,
         "repair_success_rate": null,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 0.1685199993517017,
-        "avg_verification_time_ms": 0.0477999998111045,
+        "avg_planning_time_ms": 0.3326500009279698,
+        "avg_verification_time_ms": 0.05234999844105914,
         "avg_repair_time_ms": null,
         "avg_nodes_expanded": 0.0,
         "avg_plan_cost": 0.0,
@@ -32,30 +32,30 @@
       },
       "B1_FormalizedPlanner": {
         "experiment_id": "B1_FormalizedPlanner",
-        "total_instances": 10,
+        "total_instances": 2,
         "valid_plan_rate": 1.0,
         "goal_success_rate": 1.0,
         "constraint_violation_rate": 0.0,
         "repair_success_rate": null,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 75.45095999957994,
-        "avg_verification_time_ms": 0.22532999973918777,
+        "avg_planning_time_ms": 3.8944999978411943,
+        "avg_verification_time_ms": 0.21699999342672527,
         "avg_repair_time_ms": null,
-        "avg_nodes_expanded": 78.1,
-        "avg_plan_cost": 4.6,
+        "avg_nodes_expanded": 5.0,
+        "avg_plan_cost": 3.0,
         "fault_attribution_accuracy": 0.0,
         "recovery_advantage_over_regeneration": null
       },
       "B2_VerifierNoRepair": {
         "experiment_id": "B2_VerifierNoRepair",
-        "total_instances": 10,
+        "total_instances": 2,
         "valid_plan_rate": 0.0,
         "goal_success_rate": 0.0,
         "constraint_violation_rate": 1.0,
         "repair_success_rate": 0.0,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 0.09431000034965109,
-        "avg_verification_time_ms": 0.02004000016313512,
+        "avg_planning_time_ms": 0.21860000197193585,
+        "avg_verification_time_ms": 0.0368999972124584,
         "avg_repair_time_ms": null,
         "avg_nodes_expanded": 0.0,
         "avg_plan_cost": 0.0,
@@ -64,57 +64,57 @@
       },
       "B3_GenericRegeneration": {
         "experiment_id": "B3_GenericRegeneration",
-        "total_instances": 10,
-        "valid_plan_rate": 0.5,
-        "goal_success_rate": 0.5,
-        "constraint_violation_rate": 0.5,
-        "repair_success_rate": 0.5,
-        "avg_repair_iterations": 2.2,
-        "avg_planning_time_ms": 12.971910000487696,
-        "avg_verification_time_ms": 0.07674999942537397,
-        "avg_repair_time_ms": 12.575799999467563,
-        "avg_nodes_expanded": 0.0,
-        "avg_plan_cost": 3.2,
-        "fault_attribution_accuracy": 0.0,
-        "recovery_advantage_over_regeneration": null
-      },
-      "OURS_CounterexampleRepair": {
-        "experiment_id": "OURS_CounterexampleRepair",
-        "total_instances": 10,
+        "total_instances": 2,
         "valid_plan_rate": 1.0,
         "goal_success_rate": 1.0,
         "constraint_violation_rate": 0.0,
         "repair_success_rate": 1.0,
         "avg_repair_iterations": 1.0,
-        "avg_planning_time_ms": 65.29749000037555,
-        "avg_verification_time_ms": 0.23605999995197635,
-        "avg_repair_time_ms": 64.94859999984328,
-        "avg_nodes_expanded": 78.1,
-        "avg_plan_cost": 4.6,
+        "avg_planning_time_ms": 4.477200000110315,
+        "avg_verification_time_ms": 0.2758999980869703,
+        "avg_repair_time_ms": 3.871400000207359,
+        "avg_nodes_expanded": 0.0,
+        "avg_plan_cost": 4.0,
+        "fault_attribution_accuracy": 0.0,
+        "recovery_advantage_over_regeneration": null
+      },
+      "OURS_CounterexampleRepair": {
+        "experiment_id": "OURS_CounterexampleRepair",
+        "total_instances": 2,
+        "valid_plan_rate": 1.0,
+        "goal_success_rate": 1.0,
+        "constraint_violation_rate": 0.0,
+        "repair_success_rate": 1.0,
+        "avg_repair_iterations": 1.0,
+        "avg_planning_time_ms": 4.56569999732892,
+        "avg_verification_time_ms": 0.20215000040479936,
+        "avg_repair_time_ms": 4.082550000021001,
+        "avg_nodes_expanded": 5.0,
+        "avg_plan_cost": 3.0,
         "fault_attribution_accuracy": 1.0,
-        "recovery_advantage_over_regeneration": 0.5
+        "recovery_advantage_over_regeneration": 0.0
       }
     }
   },
   "ablation_results": {
     "experiment": "Component Ablation Study",
-    "num_instances": 10,
-    "seed": 42,
+    "num_instances": 2,
+    "seed": 123,
     "ablation_runs": {
       "full": {
         "summary": {
           "experiment_id": "Ablation_full",
-          "total_instances": 10,
+          "total_instances": 2,
           "valid_plan_rate": 1.0,
           "goal_success_rate": 1.0,
           "constraint_violation_rate": 0.0,
           "repair_success_rate": 1.0,
           "avg_repair_iterations": 1.0,
-          "avg_planning_time_ms": 74.0732600006595,
-          "avg_verification_time_ms": 0.14502999947580975,
-          "avg_repair_time_ms": 74.0732600006595,
-          "avg_nodes_expanded": 78.1,
-          "avg_plan_cost": 4.6,
+          "avg_planning_time_ms": 5.221699997491669,
+          "avg_verification_time_ms": 0.19999999858555384,
+          "avg_repair_time_ms": 4.7058999989531,
+          "avg_nodes_expanded": 5.0,
+          "avg_plan_cost": 3.0,
           "fault_attribution_accuracy": 1.0,
           "recovery_advantage_over_regeneration": null
         }
@@ -122,7 +122,7 @@
       "without_verifier": {
         "summary": {
           "experiment_id": "Ablation_without_verifier",
-          "total_instances": 10,
+          "total_instances": 2,
           "valid_plan_rate": 0.0,
           "goal_success_rate": 0.0,
           "constraint_violation_rate": 1.0,
@@ -130,7 +130,7 @@
           "avg_repair_iterations": 0.0,
           "avg_planning_time_ms": 0.0,
           "avg_verification_time_ms": 0.0,
-          "avg_repair_time_ms": 0.0,
+          "avg_repair_time_ms": null,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
           "fault_attribution_accuracy": 0.0,
@@ -140,15 +140,15 @@
       "without_counterexample": {
         "summary": {
           "experiment_id": "Ablation_without_counterexample",
-          "total_instances": 10,
+          "total_instances": 2,
           "valid_plan_rate": 0.0,
           "goal_success_rate": 0.0,
           "constraint_violation_rate": 1.0,
           "repair_success_rate": 0.0,
           "avg_repair_iterations": 5.0,
-          "avg_planning_time_ms": 0.0822499998321291,
+          "avg_planning_time_ms": 0.254700004006736,
           "avg_verification_time_ms": 0.0,
-          "avg_repair_time_ms": 0.0822499998321291,
+          "avg_repair_time_ms": 0.05860000237589702,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
           "fault_attribution_accuracy": 0.0,
@@ -158,17 +158,17 @@
       "without_attribution": {
         "summary": {
           "experiment_id": "Ablation_without_attribution",
-          "total_instances": 10,
+          "total_instances": 2,
           "valid_plan_rate": 1.0,
           "goal_success_rate": 1.0,
           "constraint_violation_rate": 0.0,
           "repair_success_rate": 1.0,
           "avg_repair_iterations": 1.0,
-          "avg_planning_time_ms": 73.86307999986457,
-          "avg_verification_time_ms": 0.18382999987807125,
-          "avg_repair_time_ms": 73.86307999986457,
-          "avg_nodes_expanded": 78.1,
-          "avg_plan_cost": 4.6,
+          "avg_planning_time_ms": 6.685899999865796,
+          "avg_verification_time_ms": 0.24694999956409447,
+          "avg_repair_time_ms": 6.105899999965914,
+          "avg_nodes_expanded": 5.0,
+          "avg_plan_cost": 3.0,
           "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": null
         }
@@ -176,15 +176,15 @@
       "without_repair": {
         "summary": {
           "experiment_id": "Ablation_without_repair",
-          "total_instances": 10,
+          "total_instances": 2,
           "valid_plan_rate": 0.0,
           "goal_success_rate": 0.0,
           "constraint_violation_rate": 1.0,
           "repair_success_rate": 0.0,
           "avg_repair_iterations": 0.0,
           "avg_planning_time_ms": 0.0,
-          "avg_verification_time_ms": 0.021890000061830506,
-          "avg_repair_time_ms": 0.0,
+          "avg_verification_time_ms": 0.0626499968348071,
+          "avg_repair_time_ms": null,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
           "fault_attribution_accuracy": 0.0,
@@ -194,17 +194,17 @@
       "generic_regeneration": {
         "summary": {
           "experiment_id": "Ablation_generic_regeneration",
-          "total_instances": 10,
-          "valid_plan_rate": 0.5,
-          "goal_success_rate": 0.5,
-          "constraint_violation_rate": 0.5,
-          "repair_success_rate": 0.5,
-          "avg_repair_iterations": 3.2,
-          "avg_planning_time_ms": 26.135260000592098,
-          "avg_verification_time_ms": 0.135440000667586,
-          "avg_repair_time_ms": 26.135260000592098,
+          "total_instances": 2,
+          "valid_plan_rate": 1.0,
+          "goal_success_rate": 1.0,
+          "constraint_violation_rate": 0.0,
+          "repair_success_rate": 1.0,
+          "avg_repair_iterations": 1.0,
+          "avg_planning_time_ms": 6.932000000233529,
+          "avg_verification_time_ms": 0.5339000017556828,
+          "avg_repair_time_ms": 5.99185000100988,
           "avg_nodes_expanded": 0.0,
-          "avg_plan_cost": 3.2,
+          "avg_plan_cost": 4.0,
           "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": null
         }
@@ -292,7 +292,7 @@
   },
   "multi_domain_tier_results": [
     {
-      "instance_id": "blocks_world_tiny_2824",
+      "instance_id": "blocks_world_tiny_1857",
       "domain_id": "blocks_world",
       "tier": "TINY",
       "prompt": "Stack blocks ['b1', 'b2'] to satisfy assembly goals.",
@@ -345,7 +345,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "blocks_world_medium_1409",
+      "instance_id": "blocks_world_medium_5385",
       "domain_id": "blocks_world",
       "tier": "MEDIUM",
       "prompt": "Stack blocks ['b1', 'b2', 'b3', 'b4'] to satisfy assembly goals.",
@@ -431,7 +431,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "blocks_world_large_5506",
+      "instance_id": "blocks_world_large_2428",
       "domain_id": "blocks_world",
       "tier": "LARGE",
       "prompt": "Stack blocks ['b1', 'b2', 'b3', 'b4', 'b5'] to satisfy assembly goals.",
@@ -530,7 +530,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "grid_world_tiny_5012",
+      "instance_id": "grid_world_tiny_7672",
       "domain_id": "grid_world",
       "tier": "TINY",
       "prompt": "Navigate agent from c1 to destination cell c4 across a 4-cell grid.",
@@ -607,7 +607,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "grid_world_medium_4657",
+      "instance_id": "grid_world_medium_5367",
       "domain_id": "grid_world",
       "tier": "MEDIUM",
       "prompt": "Navigate agent and transport item_1 to destination cell c6 in MEDIUM grid configuration.",
@@ -736,7 +736,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "grid_world_large_3286",
+      "instance_id": "grid_world_large_2764",
       "domain_id": "grid_world",
       "tier": "LARGE",
       "prompt": "Navigate agent and transport item_1 to destination cell c8 in LARGE grid configuration.",
@@ -895,7 +895,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "household_robotics_tiny_2679",
+      "instance_id": "household_robotics_tiny_1625",
       "domain_id": "household_robotics",
       "tier": "TINY",
       "prompt": "Move item_1 from shelf to table in TINY household configuration.",
@@ -972,7 +972,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "household_robotics_large_9935",
+      "instance_id": "household_robotics_large_7211",
       "domain_id": "household_robotics",
       "tier": "LARGE",
       "prompt": "Move item_1 from shelf to counter in LARGE household configuration.",
@@ -1096,7 +1096,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "warehouse_tiny_2424",
+      "instance_id": "warehouse_tiny_9785",
       "domain_id": "warehouse",
       "tier": "TINY",
       "prompt": "Move sku_1 from bay_1 to bay_2 in TINY logistics configuration.",
@@ -1179,7 +1179,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "warehouse_large_7912",
+      "instance_id": "warehouse_large_6442",
       "domain_id": "warehouse",
       "tier": "LARGE",
       "prompt": "Move sku_1 from bay_1 to bay_5 in LARGE logistics configuration.",
@@ -1335,7 +1335,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "scheduling_tiny_1520",
+      "instance_id": "scheduling_tiny_6583",
       "domain_id": "scheduling",
       "tier": "TINY",
       "prompt": "Schedule tasks on available resources satisfying DAG precedence in TINY configuration.",
@@ -1395,7 +1395,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "scheduling_large_1488",
+      "instance_id": "scheduling_large_1850",
       "domain_id": "scheduling",
       "tier": "LARGE",
       "prompt": "Schedule tasks on available resources satisfying DAG precedence in LARGE configuration.",
@@ -1484,7 +1484,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "software_workflow_tiny_2535",
+      "instance_id": "software_workflow_tiny_3615",
       "domain_id": "software_workflow",
       "tier": "TINY",
       "prompt": "Build, test, scan, and deploy commit_1 to dev environment (TINY pipeline).",
@@ -1522,7 +1522,7 @@
       "is_complete": true
     },
     {
-      "instance_id": "software_workflow_small_4582",
+      "instance_id": "software_workflow_small_3212",
       "domain_id": "software_workflow",
       "tier": "SMALL",
       "prompt": "Build, test, scan, and deploy commit_1 to staging environment (SMALL pipeline).",

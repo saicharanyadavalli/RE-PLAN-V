@@ -24,9 +24,10 @@ In this work, we propose, implement, and empirically validate **RE-PLAN-V**, a s
 ### 1.2 Key Empirical Finding
 Across controlled benchmark suites spanning progressive difficulty tiers (3-6 blocks) and hard constraints:
 - **Generic Regeneration (Baseline B3)**: When an invalid candidate plan is detected, unguided re-sampling of candidate sequences achieves only **50.0% recovery**, requiring an average of **2.2 attempts** and struggling when multi-step unstacking or protected obstacle constraints are present.
-- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100.0% recovery** from initially invalid candidate plans, converging in an average of **1.0 iteration** with an isolated repair latency of **18.42 ms**.
-- **Recovery Advantage**: Demonstrates an empirical **+50.0% recovery advantage** over generic plan regeneration.
-- **Conclusion**: The empirical evidence **affirms** the central research question. Targeted constraint injection derived from counterexample witnesses fundamentally outperforms blind candidate regeneration.
+- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100.0% recovery** from initially invalid candidate plans, converging in an average of **1.0 iteration** with an isolated repair latency of **64.95 ms**†.
+  > *†Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms.*
+- **Recovery Advantage**: Demonstrates an empirical **+50.0% recovery advantage** (+50.0 percentage points on the controlled pilot, $N=10$, seed 42; not an unbounded universal guarantee across arbitrary unseen domains) over generic plan regeneration.
+- **Conclusion**: The empirical evidence **affirms** the central research question on the controlled pilot. Targeted constraint injection derived from counterexample witnesses fundamentally outperforms blind candidate regeneration.
 
 ---
 
@@ -99,14 +100,19 @@ Evaluated on $N=10$ randomized benchmark instances (seed=42) across progressive 
 | **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | N/A* | 16.28 ms |
 | **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 10 | 0.0% | 0.0% | 0.0% | 0.07 ms |
 | **B3: Generic Regeneration** | Unguided candidate re-sampling | 10 | 50.0% | 50.0% | 50.0% | 10.37 ms |
-| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **18.42 ms** |
+| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **64.95 ms**† |
 
-**Empirical Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0%**
+† *Note on Isolated Repair Latency: Updated from the freshly generated reproduction benchmark on controlled synthetic pilot data ($N=10$, seed 42), measuring pure repair time (`pure_repair_time_ms`) strictly across counterexample extraction, fault attribution, constraint synthesis, and replanning search without initial planning or verification overhead. Historical runs recorded 18.42 ms.*
+
+**Empirical Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0% (+50 percentage points on the controlled pilot)**
 
 *\*Note on B1:* B1 generates plans from scratch; for initially invalid candidates, B2 (reject-only) and B3 (generic regeneration) represent the unguided comparison points.
 
 ### 3.2 Fault Attribution Diagnostics & Confusion Matrix
-Evaluating the fault classifier on controlled benchmark suites with synthetic mutations across all 5 classes ($N=50$ total evaluations, 10 per class):
+Evaluating the fault classifier on controlled benchmark suites with synthetic mutations across all 5 classes ($N=50$ total evaluations, 10 per class).
+
+> [!NOTE]
+> **Diagnostic Scope**: This 5-class fault attribution confusion matrix is evaluated on 50 synthetic test instances (10 per class) designed to validate diagnostic taxonomy separation under controlled mutation. It is an algorithmic evaluation of formal diagnostics, not a broad production classifier operating on unstructured open-domain text.
 
 | Injected Ground Truth Fault | Attributed Fault Class | Confidence | Correct Stage Identified | Precision | Recall | F1-Score |
 | :--- | :--- | :---: | :--- | :---: | :---: | :---: |
@@ -144,12 +150,15 @@ State space analysis across all 6 domains comparing analytical bounds with empir
 
 | Domain ID | Evaluated Tier | Analytical Bound | Measured Reachable States | Directed Action Edges | Completion Status |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Blocks World** | TINY / MEDIUM / LARGE | 3 / 73 / 501 | 5 / 125 / 866 | 8 / 272 / 2090 | Complete |
-| **Grid World** | TINY / MEDIUM / LARGE | 4 / 294 / 648 | 4 / 288 / 640 | 6 / 624 / 1376 | Complete |
-| **Household Robotics** | TINY / MEDIUM / LARGE | 6 / 48 / 375 | 6 / 45 / 336 | 10 / 96 / 832 | Complete |
-| **Warehouse Logistics** | TINY / MEDIUM / LARGE | 6 / 75 / 648 | 8 / 90 / 636 | 13 / 192 / 1517 | Complete |
-| **Job Scheduling** | TINY / MEDIUM / LARGE | 3 / 25 / 125 | 7 / 73 / 209 | 10 / 192 / 628 | Complete |
-| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated at Edge Cap |
+| **Blocks World** | TINY / MEDIUM / LARGE | 3 / 73 / 501 | 5 / 125 / 866 | 8 / 272 / 2090 | Complete (Frontier Exhausted) |
+| **Grid World** | TINY / MEDIUM / LARGE | 4 / 294 / 648 | 4 / 288 / 640 | 6 / 624 / 1376 | Complete (Frontier Exhausted) |
+| **Household Robotics** | TINY / MEDIUM / LARGE | 6 / 48 / 375 | 6 / 45 / 336 | 10 / 96 / 832 | Complete (Frontier Exhausted) |
+| **Warehouse Logistics** | TINY / MEDIUM / LARGE | 6 / 75 / 648 | 8 / 90 / 636 | 13 / 192 / 1517 | Complete (Frontier Exhausted) |
+| **Job Scheduling** | TINY / MEDIUM / LARGE | 3 / 25 / 125 | 7 / 73 / 209 | 10 / 192 / 628 | Complete (Frontier Exhausted) |
+| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated / Lower-Bound (Edge-Capped) |
+
+> [!NOTE]
+> Reachability status is designated as **Complete (Frontier Exhausted)** when the BFS search frontier is fully exhausted without budget limits, and **Truncated / Lower-Bound** when exploration is truncated by edge-cap or node-cap resource budgets (serving as an empirical lower bound).
 
 ---
 

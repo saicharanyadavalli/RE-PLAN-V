@@ -4,7 +4,7 @@
 - **Repository**: `https://github.com/saicharanyadavalli/RE-PLAN-V`
 - **Target & Sole Canonical Branch**: `main`
 - **Delivery Date**: November 2026
-- **Final Status**: `PRODUCTION_DELIVERED_AND_VERIFIED`
+- **Final Status**: `RESEARCH_PROTOTYPE_VERIFIED` (Research prototype verified on canonical `main` branch; not deployed production service)
 
 ---
 
@@ -31,6 +31,10 @@ RE-PLAN-V has completed its comprehensive single-main-branch staged hardening, s
   13. `4937466` — *Stage 10.8*: Research methodology correction: B0/B1 repair rate `None` / `N/A` with zero invalid cases, empirical ground truth attribution check, and empirical lower bound labeling (DEF-10.8, DEF-10.9, DEF-10.10).
   14. `dd411ce` — *Stage 10.9*: Strict 422 boundary validation (`ge=1`, `gt=0.0`) and prompt injection containment defenses (DEF-10.11).
   15. `7a40579` — *Stage 11*: Typed action constraints, unified problem builder, graph budget ceilings/concurrency, pure isolated repair timer, security sandbox boundaries, A* weighted cost oracle, REST/WS parity, benchmark UI provenance (ST11-01 through ST11-08).
+  16. `47de162` — *Stage 11 Delivery Sign-Off*: Recorded Stage 11 delivery report and initial verification.
+  17. `dfa0de0` — *Stage 11 Audit Records*: Finalized Stage 11 audit records and SHA references.
+  18. `2ee4f1f` — *Evaluation Refresh*: Refreshed reproduction summary and primary experiment metrics from verified run.
+  19. `3b524e1` — *Final Closeout Implementation*: Unified problem builder in pipeline/websocket, websocket fail-closed early return, strict resource ceilings, ablation metrics, and 21 regression tests (Findings A through G).
 
 ---
 
@@ -103,18 +107,31 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 | **ST11-07** | `MEDIUM` | `frontend/components/BenchmarkTab.tsx` | Benchmark UI lifecycle states (`NOT_RUN`, `LOADING`, `LOADED`, `STALE`, `FAILED`), provenance banner, and isolated repair time column. | Clean Next.js 15 production build (`npm run build`). | **VERIFIED_CLOSED** |
 | **ST11-08** | `MEDIUM` | `README.md`, `RESEARCH_REPORT.md` | Research claims calibrated to controlled pilot data, reconciled 455 test counts across 46 files in JUnit XML. | Document updates and JUnit XML reconciliation. | **VERIFIED_CLOSED** |
 
+### 3.3 Final Closeout Defect Closeout Matrix (Findings A through G)
+
+| Defect ID | Severity | File Path | Remediation Summary | Verification Test Evidence | Final Status |
+|:---|:---|:---|:---|:---|:---|
+| **FIND-A** | `CRITICAL` | `app/services/pipeline.py`, `app/api/websocket.py` | Refactored `PipelineOrchestrator` and `handle_websocket_pipeline` to use `ValidatedProblemBuilder.build_from_proposal` as the unified problem-construction path. | `test_final_closeout_builder_parity.py` | **VERIFIED_CLOSED** |
+| **FIND-B** | `CRITICAL` | `app/api/websocket.py` | Added fail-closed early return in `handle_websocket_pipeline` upon `INITIAL_STATE_INVARIANT_VIOLATION`, terminating before graph enumeration or search. | `test_final_closeout_websocket_fail_closed.py` | **VERIFIED_CLOSED** |
+| **FIND-C** | `HIGH` | `evaluation/ablations/configurations.py` | Corrected ablation runner to use `pure_repair_time_ms`, set `repair_attempted = False` and `repair_time_ms = None` for non-repair variants, and evaluated attribution against ground truth `PLANNING_ERROR`. | `test_final_closeout_ablation_metrics.py` | **VERIFIED_CLOSED** |
+| **FIND-D** | `MEDIUM` | `RESEARCH_REPORT.md` | Calibrated research latency figures and added explicit explanatory note stating that `pure_repair_time_ms` is measured on controlled synthetic pilot data ($N=10$, seed 42). | Document review and benchmark reproduction. | **VERIFIED_CLOSED** |
+| **FIND-E** | `MEDIUM` | `docs/engineering/*.md` | Synchronized commit lineage across `7a40579` (implementation), `47de162` (delivery sign-off), `dfa0de0` (audit records), and `2ee4f1f` (eval refresh), plus closeout reconciliation. | Repository audit records. | **VERIFIED_CLOSED** |
+| **FIND-F** | `LOW` | `README.md` | Removed unsupported "87%+ overall coverage" claim from `README.md`, reporting verified test pass rate and test counts. | Document review. | **VERIFIED_CLOSED** |
+| **FIND-G** | `MEDIUM` | `README.md`, `docs/engineering/*.md` | Updated release status from production service to `RESEARCH_PROTOTYPE_VERIFIED` to accurately reflect a verified algorithmic research prototype. | Document review. | **VERIFIED_CLOSED** |
+
 ---
 
 ## 4. Comprehensive Empirical & Verification Evidence
 
 ### 4.1 Backend Test Suite Execution
 - **Command**: `pytest tests/ -q`
-- **Result**: **455 passed**, 2 warnings in 21.30s
-- **Breakdown** (46 test files, exactly 455 passed):
+- **Result**: **476 passed**, 2 warnings in 22.48s
+- **Breakdown** (50 test files, exactly 476 passed):
   - `tests/edge_cases/test_edge_cases.py`: 16 passed
+  - `tests/integration/test_final_closeout_builder_parity.py`: 7 passed
+  - `tests/integration/test_final_closeout_websocket_fail_closed.py`: 2 passed
   - `tests/integration/test_multi_domain_pipeline.py`: 5 passed
   - `tests/integration/test_pipeline_e2e.py`: 13 passed
-  - `tests/integration/test_stage_8_reliability.py`: 17 passed
   - `tests/integration/test_stage_10_domain_invariants_pipeline.py`: 4 passed
   - `tests/integration/test_stage_10_fail_closed_pipeline.py`: 11 passed
   - `tests/integration/test_stage_10_graph_transport_contract.py`: 3 passed
@@ -122,6 +139,7 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - `tests/integration/test_stage_11_initial_state_graph_validation.py`: 3 passed
   - `tests/integration/test_stage_11_resource_budget_boundaries.py`: 6 passed
   - `tests/integration/test_stage_11_rest_websocket_problem_parity.py`: 1 passed
+  - `tests/integration/test_stage_8_reliability.py`: 17 passed
   - `tests/integration/test_websocket_streaming.py`: 6 passed
   - `tests/property/test_properties.py`: 11 passed
   - `tests/scenarios/test_failure_scenarios.py`: 12 passed
@@ -138,6 +156,8 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - `tests/unit/test_domain_router.py`: 10 passed
   - `tests/unit/test_dynamic.py`: 3 passed
   - `tests/unit/test_evaluation.py`: 5 passed
+  - `tests/unit/test_final_closeout_ablation_metrics.py`: 4 passed
+  - `tests/unit/test_final_closeout_resource_validation.py`: 8 passed
   - `tests/unit/test_interpretation.py`: 15 passed
   - `tests/unit/test_krr.py`: 6 passed
   - `tests/unit/test_lm_studio_provider.py`: 5 passed
@@ -207,6 +227,6 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 
 ## 6. Sign-off & Delivery Conclusion
 
-All acceptance criteria across Stages 0 through 11 have been fulfilled with explicit executable command evidence. All 30 cataloged defects across Stages 0–9 (DEF-01 to DEF-11), Stage 10 (DEF-10.1 to DEF-10.11), and Stage 11 (ST11-01 to ST11-08) are closed. The repository is linear, clean, and has `main` as its sole canonical branch.
+All acceptance criteria across Stages 0 through 11 and the Final Closeout have been fulfilled with explicit executable command evidence. All 37 cataloged defects across Stages 0–9 (DEF-01 to DEF-11), Stage 10 (DEF-10.1 to DEF-10.11), Stage 11 (ST11-01 to ST11-08), and Final Closeout (Findings A to G) are closed. The repository is linear, clean, and has `main` as its sole canonical branch.
 
-**Final Release Status**: `ACCEPTED_AND_VERIFIED_ON_MAIN`
+**Final Release Status**: `RESEARCH_PROTOTYPE_VERIFIED`
