@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import random
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.actions.domain import Domain
+from core.actions.generator import LegalActionGenerator
 from core.actions.instantiation import GroundAction
+from core.actions.transition import apply_transition
 from core.attribution.classifier import FaultAttributionEngine
 from core.contracts import (
     PlanSchema,
@@ -199,17 +202,65 @@ class ReplanningEngine:
             history=history,
         )
 
+    def _sample_candidate_plan(
+        self,
+        problem: SymbolicProblem,
+        domain: Domain,
+        rng: random.Random,
+        max_horizon: int = 10,
+    ) -> PlanSchema:
+        """Samples an unguided candidate plan without counterexample constraints.
+        
+        Simulates an unconstrained candidate proposal generator (e.g. LLM or stochastic rollout)
+        that attempts to achieve goals without knowing which transition or constraint previously failed.
+        """
+        action_gen = LegalActionGenerator(domain.get_all_actions(), problem.registry)
+        curr_state = problem.initial_state
+        plan_actions = []
+
+        for _ in range(max_horizon):
+            if problem.is_goal_satisfied(curr_state):
+                break
+            applicable = action_gen.get_applicable_actions(curr_state)
+            if not applicable:
+                break
+            # Unguided heuristic: bias towards actions that produce unmet goal facts
+            unmet = set(problem.find_unmet_goals(curr_state))
+            goal_relevant = [
+                a for a in applicable
+                if any(eff in unmet for eff in a.add_effects)
+            ]
+            if goal_relevant and rng.random() < 0.65:
+                chosen = rng.choice(goal_relevant)
+            else:
+                chosen = rng.choice(applicable)
+
+            plan_actions.append(chosen.to_schema())
+            next_state, err = apply_transition(curr_state, chosen)
+            if err is not None:
+                break
+            curr_state = next_state
+
+        return PlanSchema(
+            actions=plan_actions,
+            algorithm="B3_UnguidedRegeneration",
+            total_cost=float(len(plan_actions)),
+            is_success=problem.is_goal_satisfied(curr_state),
+        )
+
     def run_generic_regeneration_baseline(
         self,
         problem: SymbolicProblem,
         domain: Domain,
         initial_candidate: PlanSchema,
         max_attempts: int = 5,
+        seed: int = 42,
     ) -> ReplanningResultSchema:
         """Baseline B3: Generic unguided regeneration without counterexample repair constraints."""
         start_time = time.perf_counter()
         current_candidate = initial_candidate
         history: List[Dict[str, Any]] = []
+        rng = random.Random(seed)
 
         for attempt in range(max_attempts + 1):
             v_res = self.verifier.verify(problem, domain, current_candidate)
@@ -235,10 +286,8 @@ class ReplanningEngine:
             if attempt >= max_attempts:
                 break
 
-            # Blind regeneration: re-run search without any counterexample constraints
-            # (In standard planners, this yields the same deterministic candidate or fails to recover)
-            new_candidate = self.planner.search(problem, domain)
-            current_candidate = new_candidate
+            # Unguided regeneration: sample alternative candidate plan without CEX constraints
+            current_candidate = self._sample_candidate_plan(problem, domain, rng)
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         return ReplanningResultSchema(

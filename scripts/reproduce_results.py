@@ -56,7 +56,7 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print(f"\nMeasured Recovery Advantage (OURS vs B3 Generic Regeneration): {advantage:+.1f}%")
 
     # 2. Ablation Study
-    print(f"\n[2/2] Executing Component Ablation Studies ({num_instances} instances, seed={seed})...")
+    print(f"\n[2/3] Executing Component Ablation Studies ({num_instances} instances, seed={seed})...")
     ablation_results = ablation_runner.run_ablation_experiment(
         num_instances=num_instances,
         seed=seed,
@@ -72,6 +72,17 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
         print(f"{cfg_name:<32} | {summary['total_instances']:<10} | {rep_rate:<20} | {avg_iter}")
     print("-" * 80)
 
+    # 3. 5-Class Fault Attribution Matrix Experiment
+    print(f"\n[3/3] Executing 5-Class Fault Attribution Matrix Experiment (50 instances, 10/class)...")
+    attr_results = exp_runner.run_attribution_experiment(instances_per_class=10, seed=seed)
+    print("\n" + "-" * 80)
+    print(f"{'Injected Ground Truth':<24} | {'Precision':<10} | {'Recall':<10} | {'F1-Score':<10} | {'Support'}")
+    print("-" * 80)
+    for c_name, p_data in attr_results["per_class"].items():
+        print(f"{c_name:<24} | {p_data['precision']:<10.2f} | {p_data['recall']:<10.2f} | {p_data['f1_score']:<10.2f} | {p_data['support']}")
+    print("-" * 80)
+    print(f"Overall Attribution Macro Accuracy: {attr_results['accuracy'] * 100:.1f}% | Macro F1: {attr_results['macro_f1']:.2f}")
+
     # Save summary report
     elapsed = time.perf_counter() - start_time
     output_file = Path("evaluation/reports/full_reproduction_summary.json")
@@ -83,13 +94,14 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
                 "elapsed_seconds": elapsed,
                 "primary_results": primary_results,
                 "ablation_results": ablation_results,
+                "attribution_results": attr_results,
             },
             f,
             indent=2,
         )
 
     print(f"\n[OK] All reproduction benchmarks completed in {elapsed:.2f}s.")
-    print(f"Reports saved to:\n- evaluation/reports/primary_research_experiment.json\n- {output_file}")
+    print(f"Reports saved to:\n- evaluation/reports/primary_research_experiment.json\n- evaluation/reports/fault_attribution_matrix.json\n- {output_file}")
     print("=" * 80)
 
 

@@ -52,13 +52,15 @@ export function AcademicDefenseModal({ isOpen, onClose }: AcademicDefenseModalPr
             </div>
 
             {/* Why 2B Model */}
+            {/* Why 2B Model */}
             <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-4">
               <h4 className="font-mono text-xs font-bold uppercase text-cyan-300">
                 2. "Why a 2-Billion Parameter Model Excels Here"
               </h4>
               <p className="mt-1 leading-relaxed text-slate-300">
-                Stand-alone 70B models fail 65% of the time on planning (NeurIPS PlanBench). 
-                In RE-PLAN-V, pairing a local <strong>2B model (Gemma 2 2B / Qwen 2.5) with our formal verifier</strong> guarantees <strong>100% plan safety</strong> at zero cloud cost and &lt; 5 ms search latency.
+                Stand-alone large LLMs fail up to 65% of the time on complex planning benchmarks (PlanBench). 
+                In RE-PLAN-V, pairing a local <strong>2B model (Gemma 2 2B / Qwen 2.5) with our authoritative verifier</strong> provides 
+                formal plan validity guarantees within modeled domain semantics at zero cloud cost.
               </p>
             </div>
 
@@ -86,9 +88,9 @@ export function AcademicDefenseModal({ isOpen, onClose }: AcademicDefenseModalPr
 
                 </div>
                 <div>
-                  <strong className="text-cyan-300">Q: Why does Baseline B3 get 0% recovery while RE-PLAN-V gets 100%?</strong>
+                  <strong className="text-cyan-300">Q: What gives RE-PLAN-V a recovery advantage over generic regeneration (B3)?</strong>
                   <p className="mt-0.5 text-slate-400">
-                    Because search is deterministic. Without new constraints, unguided replanning repeats the exact same flawed branch. RE-PLAN-V injects negative pruning constraints derived from the counterexample witness, pruning the failing branch.
+                    B3 regenerates alternative candidate sequences without structured failure information, leaving it vulnerable to re-sampling invalid branches. RE-PLAN-V extracts an exact counterexample witness and injects negative pruning constraints, systematically blocking the failing state transition during replanning.
                   </p>
                 </div>
               </div>

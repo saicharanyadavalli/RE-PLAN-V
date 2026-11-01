@@ -86,7 +86,7 @@ class SymbolicProblem:
             objects=self.registry.get_all_objects(),
             initial_facts=[f.to_schema() for f in sorted(self.initial_state.facts)],
             goal_facts=[g.to_schema() for g in self.goal_conditions],
-            description=self.description,
+            natural_language_prompt=self.description,
         )
 
     def __repr__(self) -> str:

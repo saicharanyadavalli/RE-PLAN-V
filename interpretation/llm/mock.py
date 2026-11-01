@@ -49,7 +49,7 @@ class MockLLMProvider(BaseLLMProvider):
             )
 
         # 2. Tower Inversion / Deconstruction & Reconstruction
-        if "unstack" in prompt_lower or "inversion" in prompt_lower or ("red box is on the green box" in prompt_lower and "stack the green" in prompt_lower):
+        if "inversion" in prompt_lower or ("unstack" in prompt_lower and "invert" in prompt_lower) or "unstack the red" in prompt_lower or ("red box is on the green box" in prompt_lower and "stack the green" in prompt_lower):
             entities = {"red_box": "block", "green_box": "block"}
             initial_facts = [
                 FactSchema(predicate="on_table", arguments=("green_box",)),
@@ -165,8 +165,8 @@ class MockLLMProvider(BaseLLMProvider):
                 confidence=0.98,
             )
 
-        # 7. Contradictory / Deadlock scenario
-        if "simultaneously" in prompt_lower or ("red box on the green box and the green box on the red" in prompt_lower):
+        # 7. Contradictory / Deadlock scenario (Circular simultaneous dependency)
+        if (("simultaneously" in prompt_lower or "cycle" in prompt_lower or "circular" in prompt_lower) and ("green" in prompt_lower or "each other" in prompt_lower or "both" in prompt_lower)) or ("red box on the green box and the green box on the red" in prompt_lower):
             entities = {"red_box": "block", "green_box": "block"}
             initial_facts = [
                 FactSchema(predicate="on_table", arguments=("red_box",)),
@@ -187,6 +187,130 @@ class MockLLMProvider(BaseLLMProvider):
                 initial_facts=initial_facts,
                 goal_facts=goal_facts,
                 confidence=0.5,
+            )
+
+        # 7a. Unsupported Operator / Predicate (e.g. "teleport" or "fly")
+        if "teleport" in prompt_lower or "fly" in prompt_lower:
+            entities = {"red_box": "block", "blue_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_unsupported_operator",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("red_box",)),
+                    FactSchema(predicate="clear", arguments=("red_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="teleported_to", arguments=("red_box", "blue_box"))],
+                confidence=0.9,
+            )
+
+        # 7b. Mutex Contradiction in Initial State (holding object while handempty)
+        if "hand is empty while holding" in prompt_lower or "holding and hand is empty" in prompt_lower or "simultaneously holding and handempty" in prompt_lower:
+            entities = {"red_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_mutex_contradiction",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="holding", arguments=("red_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="on_table", arguments=("red_box",))],
+                confidence=0.9,
+            )
+
+        # 7c. Direct Goal vs Negative Constraint Contradiction
+        if "never place red" in prompt_lower or "never stack red on blue" in prompt_lower or "do not put red on blue" in prompt_lower or "forbidden to put red on blue" in prompt_lower:
+            entities = {"red_box": "block", "blue_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_goal_constraint_contradiction",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("red_box",)),
+                    FactSchema(predicate="clear", arguments=("red_box",)),
+                    FactSchema(predicate="on_table", arguments=("blue_box",)),
+                    FactSchema(predicate="clear", arguments=("blue_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="on", arguments=("red_box", "blue_box"))],
+                negative_constraints=[FactSchema(predicate="on", arguments=("red_box", "blue_box"))],
+                confidence=0.9,
+            )
+
+        # 7d. Self-stacking cycle (A on A)
+        if "on itself" in prompt_lower or "on top of itself" in prompt_lower or "red box on the red box" in prompt_lower or "red box on red box" in prompt_lower:
+            entities = {"red_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_self_stack_deadlock",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("red_box",)),
+                    FactSchema(predicate="clear", arguments=("red_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="on", arguments=("red_box", "red_box"))],
+                confidence=0.5,
+            )
+
+        # 7e. Total Action Blockade (Deadlock by over-constraint)
+        if "without touching any block" in prompt_lower or "never touch any block" in prompt_lower:
+            entities = {"red_box": "block", "blue_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_total_blockade_deadlock",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("red_box",)),
+                    FactSchema(predicate="clear", arguments=("red_box",)),
+                    FactSchema(predicate="on_table", arguments=("blue_box",)),
+                    FactSchema(predicate="clear", arguments=("blue_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="on", arguments=("red_box", "blue_box"))],
+                negative_constraints=[
+                    FactSchema(predicate="holding", arguments=("red_box",)),
+                    FactSchema(predicate="holding", arguments=("blue_box",)),
+                ],
+                confidence=0.8,
+            )
+
+        # 7f. Predicate Arity Mismatch (e.g. on_table expecting 1 arg, given 2)
+        if "surface" in prompt_lower or "arity" in prompt_lower:
+            entities = {"red_box": "block", "table_surface": "block"}
+            return TaskProposalSchema(
+                task_id="mock_arity_mismatch",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("red_box", "table_surface")),
+                    FactSchema(predicate="clear", arguments=("red_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="clear", arguments=("table_surface",))],
+                confidence=0.8,
+            )
+
+        # 7g. Buried target with forbidden unstacking
+        if "buried" in prompt_lower or ("bottom block" in prompt_lower and "forbidden" in prompt_lower):
+            entities = {"top_box": "block", "bottom_box": "block"}
+            return TaskProposalSchema(
+                task_id="mock_buried_target_deadlock",
+                raw_prompt=prompt,
+                entities=entities,
+                initial_facts=[
+                    FactSchema(predicate="on_table", arguments=("bottom_box",)),
+                    FactSchema(predicate="on", arguments=("top_box", "bottom_box")),
+                    FactSchema(predicate="clear", arguments=("top_box",)),
+                    FactSchema(predicate="handempty", arguments=()),
+                ],
+                goal_facts=[FactSchema(predicate="holding", arguments=("bottom_box",))],
+                negative_constraints=[
+                    FactSchema(predicate="holding", arguments=("top_box",)),
+                ],
+                confidence=0.8,
             )
 
         # 8. Canonical DoD prompt: "Move the red box next to the blue box. Do not move the glass."

@@ -87,30 +87,78 @@ class LiveLLMProvider(BaseLLMProvider):
         except Exception:
             pass
 
-        self.provider = (provider or "auto").lower()
+        # Check LLM_PROVIDER in env if provider is "auto"
+        env_llm_provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
+        if (not provider or provider == "auto") and env_llm_provider:
+            self.provider = env_llm_provider
+        else:
+            self.provider = (provider or "auto").lower()
+
         self.model = model
         self.lm_studio_url = os.environ.get("LM_STUDIO_URL", "http://127.0.0.1:1234").rstrip("/")
         self.endpoint = endpoint or os.environ.get("LOCAL_LLM_URL", "http://localhost:11434/v1")
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        self.api_key = api_key or os.environ.get("NVIDIA_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")
         self.fallback = fallback_provider or MockLLMProvider()
+        # Request cache for the ₹0 guarantee (Feature 17 in explainer doc)
+        self._cache: Dict[str, TaskProposalSchema] = {}
 
     def interpret(self, prompt: str, domain: Domain) -> TaskProposalSchema:
         """Interprets a natural language instruction into a formal TaskProposalSchema."""
+        cache_key = f"{self.provider}:{self.model}:{prompt.strip().lower()}"
+        if cache_key in self._cache:
+            logger.info(f"Returning cached formalization for '{prompt[:40]}...'")
+            return self._cache[cache_key]
+
         # 1. Deterministic zero-API mock requested
         if self.provider == "mock":
-            return self.fallback.interpret(prompt, domain)
+            res = self.fallback.interpret(prompt, domain)
+            self._cache[cache_key] = res
+            return res
 
-        # 2. LM Studio Local Model (Native v1 /api/v1/chat or /v1/chat/completions)
-        if self.provider in ("lmstudio", "lm_studio", "local_lm", "auto"):
+        # 2. NVIDIA NIM API (if explicitly selected or NVIDIA_API_KEY is configured)
+        nvidia_key = os.environ.get("NVIDIA_API_KEY")
+        if (self.provider in ("nvidia", "auto")) and nvidia_key:
+            try:
+                proposal = self._call_nvidia(
+                    prompt=prompt,
+                    api_key=nvidia_key,
+                    model=self.model or os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+                )
+                if proposal:
+                    logger.info(f"Successfully formalized prompt via NVIDIA NIM: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
+                    return proposal
+            except Exception as e:
+                logger.warning(f"NVIDIA API invocation failed ({e}); falling back.")
+
+        # 3. OpenRouter API (if explicitly selected or OPENROUTER_API_KEY is configured)
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        if (self.provider in ("openrouter", "auto")) and openrouter_key:
+            try:
+                proposal = self._call_openrouter(
+                    prompt=prompt,
+                    api_key=openrouter_key,
+                    model=self.model or os.environ.get("OPENROUTER_MODEL", "qwen/qwen-2.5-7b-instruct"),
+                )
+                if proposal:
+                    logger.info(f"Successfully formalized prompt via OpenRouter: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
+                    return proposal
+            except Exception as e:
+                logger.warning(f"OpenRouter API invocation failed ({e}); falling back.")
+
+        # 3. LM Studio Local Model (Native v1 /api/v1/chat or /v1/chat/completions)
+        if self.provider in ("lmstudio", "lm_studio", "local_lm", "local", "auto"):
             try:
                 proposal = self._call_lm_studio(prompt)
                 if proposal:
                     logger.info(f"Successfully formalized prompt via LM Studio: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
                     return proposal
             except Exception as e:
                 logger.debug(f"LM Studio call failed ({e}); evaluating other providers or fallback.")
 
-        # 3. Local Ollama 2B Model
+        # 4. Local Ollama 2B Model
         if self.provider in ("ollama", "local", "auto"):
             try:
                 proposal = self._call_openai_compatible(
@@ -121,22 +169,24 @@ class LiveLLMProvider(BaseLLMProvider):
                 )
                 if proposal:
                     logger.info(f"Successfully formalized prompt via Ollama: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
                     return proposal
             except Exception as e:
                 logger.debug(f"Ollama call failed ({e}); checking cloud or fallback.")
 
-        # 4. Google Gemini API (if GEMINI_API_KEY is provided)
+        # 5. Google Gemini API (if GEMINI_API_KEY is provided)
         gemini_key = self.api_key or os.environ.get("GEMINI_API_KEY")
         if (self.provider in ("gemini", "auto")) and gemini_key:
             try:
                 proposal = self._call_gemini_api(prompt=prompt, api_key=gemini_key)
                 if proposal:
                     logger.info(f"Successfully formalized prompt via Gemini API: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
                     return proposal
             except Exception as e:
                 logger.warning(f"Gemini API invocation failed ({e}); falling back.")
 
-        # 5. OpenAI API (if OPENAI_API_KEY is provided)
+        # 6. OpenAI API (if OPENAI_API_KEY is provided)
         openai_key = os.environ.get("OPENAI_API_KEY")
         if (self.provider in ("openai", "auto")) and openai_key:
             try:
@@ -148,13 +198,16 @@ class LiveLLMProvider(BaseLLMProvider):
                 )
                 if proposal:
                     logger.info(f"Successfully formalized prompt via OpenAI: {prompt[:40]}...")
+                    self._cache[cache_key] = proposal
                     return proposal
             except Exception as e:
                 logger.warning(f"OpenAI API invocation failed ({e}); falling back.")
 
-        # 6. Fallback to deterministic zero-API rule-based mock
+        # 7. Fallback to deterministic zero-API rule-based mock
         logger.info(f"Using deterministic zero-API fallback for prompt: '{prompt}'")
-        return self.fallback.interpret(prompt, domain)
+        res = self.fallback.interpret(prompt, domain)
+        self._cache[cache_key] = res
+        return res
 
     def interpret_with_retry(
         self,
@@ -182,8 +235,30 @@ class LiveLLMProvider(BaseLLMProvider):
         if self.provider == "mock":
             return self.fallback.interpret(effective_prompt, domain), "mock"
 
+        # NVIDIA NIM
+        nvidia_key = os.environ.get("NVIDIA_API_KEY")
+        if (self.provider in ("nvidia", "auto")) and nvidia_key:
+            try:
+                model_used = self.model or os.environ.get("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
+                proposal = self._call_nvidia(effective_prompt, nvidia_key, model_used)
+                if proposal:
+                    return proposal, f"nvidia:{model_used}"
+            except Exception as e:
+                logger.debug(f"NVIDIA retry attempt failed: {e}")
+
+        # OpenRouter
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        if (self.provider in ("openrouter", "auto")) and openrouter_key:
+            try:
+                model_used = self.model or os.environ.get("OPENROUTER_MODEL", "qwen/qwen-2.5-7b-instruct")
+                proposal = self._call_openrouter(effective_prompt, openrouter_key, model_used)
+                if proposal:
+                    return proposal, f"openrouter:{model_used}"
+            except Exception as e:
+                logger.debug(f"OpenRouter retry attempt failed: {e}")
+
         # LM Studio
-        if self.provider in ("lmstudio", "lm_studio", "local_lm", "auto"):
+        if self.provider in ("lmstudio", "lm_studio", "local_lm", "local", "auto"):
             try:
                 proposal = self._call_lm_studio(effective_prompt)
                 if proposal:
@@ -354,6 +429,92 @@ class LiveLLMProvider(BaseLLMProvider):
                             break
                 except Exception as e:
                     logger.debug(f"Gemini API attempt (model={model_name}, trust_env={trust}) failed: {e}")
+        return None
+
+    def _call_nvidia(
+        self, prompt: str, api_key: str, model: str
+    ) -> Optional[TaskProposalSchema]:
+        """Calls NVIDIA NIM chat completions API (https://integrate.api.nvidia.com/v1) with streaming."""
+        base_url = os.environ.get("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").rstrip("/")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key.strip()}",
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_FORMALIZER_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4096,
+            "stream": True,
+        }
+
+        for trust in [False, True]:
+            try:
+                accumulated_content = []
+                with httpx.Client(trust_env=trust, timeout=90.0) as client:
+                    with client.stream("POST", f"{base_url}/chat/completions", json=payload, headers=headers) as resp:
+                        if resp.status_code != 200:
+                            logger.warning(f"NVIDIA API returned HTTP {resp.status_code}: {resp.text[:300] if hasattr(resp, 'text') else ''}")
+                            break
+                        for line in resp.iter_lines():
+                            if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                                try:
+                                    chunk = json.loads(line[6:])
+                                    delta = chunk["choices"][0].get("delta", {})
+                                    content_piece = delta.get("content", "")
+                                    if content_piece:
+                                        accumulated_content.append(content_piece)
+                                except Exception:
+                                    pass
+                full_text = "".join(accumulated_content)
+                if full_text:
+                    return self._parse_json_to_schema(full_text, prompt)
+            except Exception as e:
+                logger.debug(f"NVIDIA NIM call attempt failed (trust_env={trust}): {e}")
+        return None
+
+    def _call_openrouter(
+        self, prompt: str, api_key: str, model: str
+    ) -> Optional[TaskProposalSchema]:
+        """Calls OpenRouter chat completions API (https://openrouter.ai/api/v1/chat/completions)."""
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key.strip()}",
+            "HTTP-Referer": "https://github.com/re-plan-v",
+            "X-Title": "RE-PLAN-V Neurosymbolic",
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_FORMALIZER_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.0,
+            "max_tokens": 1024,
+        }
+        # Try both trust_env=False and trust_env=True for Windows proxy bypass
+        for trust in [False, True]:
+            try:
+                with httpx.Client(trust_env=trust, timeout=60.0) as client:
+                    resp = client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        json=payload,
+                        headers=headers,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        content = data["choices"][0]["message"]["content"]
+                        return self._parse_json_to_schema(content, prompt)
+                    else:
+                        logger.warning(
+                            f"OpenRouter API returned {resp.status_code}: {resp.text[:300]}"
+                        )
+                        break
+            except Exception as e:
+                logger.debug(f"OpenRouter attempt failed (trust_env={trust}): {e}")
         return None
 
     def _call_openai_compatible(

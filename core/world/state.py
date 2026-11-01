@@ -31,7 +31,7 @@ class SymbolicState:
         self._facts: FrozenSet[Fact] = frozenset(positive_facts)
         self._objects: Dict[str, str] = dict(objects or {})
         self._step_index: int = int(step_index)
-        self._hash: int = hash((self._facts, self._step_index))
+        self._hash: int = hash((self._facts, tuple(sorted(self._objects.items()))))
 
     @property
     def facts(self) -> FrozenSet[Fact]:
@@ -116,7 +116,7 @@ class SymbolicState:
         return self._facts == other._facts and self._objects == other._objects
 
     def __hash__(self) -> int:
-        return hash(self._facts)
+        return self._hash
 
     def __repr__(self) -> str:
         facts_str = ", ".join(f.to_string() for f in sorted(self._facts))

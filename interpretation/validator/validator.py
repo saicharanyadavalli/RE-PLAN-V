@@ -87,6 +87,15 @@ class ConsistencyValidator:
                 if any(f.predicate.lower() == "on_table" and f.arguments and f.arguments[0] == held_obj and not f.is_negated for f in proposal.initial_facts):
                     errors.append(f"Mutex violation: object '{held_obj}' cannot be simultaneously holding and on_table.")
 
+        # Check if any goal condition directly contradicts a negative constraint
+        goal_tuples = {(g.predicate.lower(), tuple(g.arguments)) for g in proposal.goal_facts if not g.is_negated}
+        for neg in proposal.negative_constraints:
+            neg_tuple = (neg.predicate.lower(), tuple(neg.arguments))
+            if neg_tuple in goal_tuples:
+                errors.append(
+                    f"Direct contradiction: goal condition '{neg.to_string()}' is simultaneously declared as a negative constraint."
+                )
+
         if errors:
             status = ValidationStatus.CONTRADICTION if "Contradiction" in errors[0] else ValidationStatus.SCHEMA_ERROR
             if any("Unknown entity" in e for e in errors):
@@ -124,7 +133,17 @@ class ConsistencyValidator:
             reg.register_object(name, type_name)
 
         init_facts = [Fact.from_schema(f) for f in proposal.initial_facts]
-        init_state = SymbolicState(facts=init_facts, objects=reg.get_all_objects())
+        # Enforce physical consistency: if on(x, y) holds, y is covered and cannot be clear(y)
+        covered_objects = {
+            f.arguments[1]
+            for f in init_facts
+            if f.predicate.lower() == "on" and len(f.arguments) >= 2 and not f.is_negated
+        }
+        consistent_facts = [
+            f for f in init_facts
+            if not (f.predicate.lower() == "clear" and f.arguments and f.arguments[0] in covered_objects and not f.is_negated)
+        ]
+        init_state = SymbolicState(facts=consistent_facts, objects=reg.get_all_objects())
 
         goal_facts = [Fact.from_schema(g) for g in proposal.goal_facts]
 

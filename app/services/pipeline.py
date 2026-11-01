@@ -110,7 +110,7 @@ class PipelineOrchestrator:
         image: Optional[Image.Image] = None,
         algorithm: str = "A*",
         force_invalid_first_candidate: bool = False,
-        provider_type: str = "mock",
+        provider_type: Optional[str] = None,
         llm_model: Optional[str] = None,
     ) -> PipelineExecutionResult:
         """Executes the full Retry Tree pipeline from natural language prompt to verified plan.
@@ -125,9 +125,21 @@ class PipelineOrchestrator:
         trace = PipelineDecisionTrace()
 
         # ──── Resolve LLM provider ─────────────────────────────────────
-        if provider_type and provider_type != "mock":
+        import os
+        effective_provider = provider_type
+        if effective_provider is None:
+            if not isinstance(self.llm_provider, MockLLMProvider):
+                effective_provider = "custom"
+            else:
+                env_provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
+                if env_provider and env_provider != "mock":
+                    effective_provider = env_provider
+                else:
+                    effective_provider = "mock"
+
+        if effective_provider not in ("mock", "custom", "", None):
             from interpretation.llm.live import LiveLLMProvider
-            active_provider = LiveLLMProvider(provider=provider_type, model=llm_model)
+            active_provider = LiveLLMProvider(provider=effective_provider, model=llm_model)
             is_live = True
         else:
             active_provider = self.llm_provider

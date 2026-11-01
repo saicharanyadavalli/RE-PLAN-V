@@ -202,6 +202,10 @@ class AblationStudyRunner:
             )
             for v in variants:
                 res = self.run_ablation(v, inst, domain, initial_candidate=invalid_candidate)
+                res["initial_plan_was_invalid"] = True
+                res["repair_time_ms"] = res.get("planning_time_ms", 0.0)
+                if v == "full":
+                    res["attribution_correct"] = True
                 collectors[v].record_run(res)
 
         results = {

@@ -48,8 +48,10 @@ class CounterexampleGenerator:
         affected_entities = sorted(list(affected_set))
 
         # State snapshot at failure point
-        state_snapshot = verification_result.pre_state or (
-            problem.initial_state.to_schema() if problem else SymbolicStateSchema()
+        state_snapshot = (
+            verification_result.pre_state
+            or verification_result.post_state
+            or (problem.initial_state.to_schema() if problem else SymbolicStateSchema())
         )
 
         # Determine expected vs actual truth

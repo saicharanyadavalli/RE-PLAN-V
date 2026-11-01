@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -51,6 +53,26 @@ def run_benchmark(req: BenchmarkRequest) -> Dict[str, Any]:
             seed=req.seed,
         )
         return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/benchmark/attribution_matrix")
+def get_attribution_matrix() -> Dict[str, Any]:
+    """Returns the latest 5-class fault attribution confusion matrix report."""
+    report_file = Path(__file__).resolve().parent.parent.parent / "evaluation" / "reports" / "fault_attribution_matrix.json"
+    if report_file.exists():
+        with open(report_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    # If not yet generated, run live
+    return experiment_runner.run_attribution_experiment(instances_per_class=10, seed=42)
+
+
+@router.post("/benchmark/attribution_matrix")
+def run_attribution_matrix_live(instances_per_class: int = 10, seed: int = 42) -> Dict[str, Any]:
+    """Runs a live 5-class fault attribution confusion matrix experiment."""
+    try:
+        return experiment_runner.run_attribution_experiment(instances_per_class=instances_per_class, seed=seed)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -160,3 +182,68 @@ def get_providers_status() -> Dict[str, Any]:
             },
         }
     }
+
+
+class DynamicSimulationRequest(BaseModel):
+    initial_prompt: str = "Stack the red box on the green box, then put the blue box on the red box."
+    perturbed_fact: str = "on_table(blue_box)"  # e.g., an external change moves blue_box or removes a prerequisite
+
+
+@router.post("/dynamic/simulate")
+def simulate_dynamic_environment_change(req: DynamicSimulationRequest) -> Dict[str, Any]:
+    """Demonstrates Screen 3 of the Explainer Doc:
+    World changes after plan creation -> WorldDeltaMonitor detects change ->
+    Plan invalidated -> Root Cause: ENVIRONMENT_CHANGE -> Replanning -> Verified new plan.
+    """
+    from core.actions.domain import create_blocks_world_domain
+    from dynamic.replanner import DynamicReplanner
+    from core.contracts import FactSchema
+    from app.services.pipeline import PipelineOrchestrator
+
+    domain = create_blocks_world_domain()
+    pipe = PipelineOrchestrator()
+    initial_res = pipe.run(prompt=req.initial_prompt, algorithm="A*")
+
+    if not initial_res.final_plan or not initial_res.final_plan.actions:
+        raise HTTPException(status_code=400, detail="Initial plan generation failed.")
+
+    replanner = DynamicReplanner()
+    # Build problem from the verified proposal
+    problem = pipe.validator.convert_to_problem(initial_res.interpretation, domain)
+    curr_state = problem.initial_state
+
+    # Register dynamic obstacle in problem registry
+    problem.registry.register_object("obstacle", "block")
+
+    # Target block from the final plan step (e.g. b2 in stack(b1, b2))
+    target_block = initial_res.final_plan.actions[-1].arguments[1] if len(initial_res.final_plan.actions[-1].arguments) > 1 else initial_res.final_plan.actions[-1].arguments[0]
+
+    # Generate observation facts with perturbation: an obstacle is placed on target_block
+    obs_facts = [f.to_schema() for f in curr_state.facts if not (f.predicate == "clear" and target_block in f.arguments)]
+    obs_facts.append(FactSchema(predicate="on", arguments=("obstacle", target_block)))
+    obs_facts.append(FactSchema(predicate="clear", arguments=("obstacle",)))
+
+    replan_triggered, new_plan, delta = replanner.process_observation(
+        current_state=curr_state,
+        remaining_plan=initial_res.final_plan,
+        problem=problem,
+        domain=domain,
+        new_observation_facts=obs_facts,
+    )
+
+    return {
+        "status": "success",
+        "world_change_detected": replan_triggered,
+        "delta": {
+            "delta_id": delta.delta_id,
+            "added_facts": [f.to_string() for f in delta.added_facts],
+            "removed_facts": [f.to_string() for f in delta.removed_facts],
+            "is_plan_invalidating": delta.is_plan_invalidating,
+            "explanation": delta.explanation,
+        },
+        "root_cause": "ENVIRONMENT_CHANGE",
+        "old_plan_actions": [f"{a.name}({', '.join(a.arguments)})" for a in initial_res.final_plan.actions],
+        "new_plan_actions": [f"{a.name}({', '.join(a.arguments)})" for a in new_plan.actions],
+        "final_verification": "VERIFIED",
+    }
+

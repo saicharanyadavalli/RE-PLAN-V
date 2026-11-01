@@ -19,6 +19,7 @@ from core.repair.generator import RepairGenerator
 from core.replanning.loop import ReplanningEngine
 from core.search.algorithms import AStarPlanner
 from core.verification.verifier import PlanVerifier
+from core.world.constraints import NegativeFactInvariant, ProhibitedEntityActionConstraint
 from core.world.predicates import Fact
 from core.world.problem import SymbolicProblem
 from core.world.state import SymbolicState
@@ -34,12 +35,36 @@ def instance_to_problem(instance: BenchmarkInstanceSchema, domain: Domain) -> Sy
     init_state = SymbolicState(facts=init_facts, objects=reg.get_all_objects())
     goals = [Fact.from_schema(g) for g in instance.goal_facts]
 
+    hard_constraints = []
+    if instance.constraints:
+        for c in instance.constraints:
+            if c.predicate == "holding" and c.is_negated and c.arguments:
+                hard_constraints.append(
+                    ProhibitedEntityActionConstraint(
+                        protected_entity=c.arguments[0],
+                        prohibited_actions=["pick_up", "unstack"],
+                        description=f"Do not touch or move {c.arguments[0]}",
+                    )
+                )
+
+    invariants = []
+    if instance.invariants:
+        for inv in instance.invariants:
+            invariants.append(
+                NegativeFactInvariant(
+                    forbidden_fact=Fact.from_schema(inv),
+                    description=f"Never allow condition {inv.to_string()}",
+                )
+            )
+
     return SymbolicProblem(
         name=instance.name,
         domain_name=instance.domain,
         registry=reg,
         initial_state=init_state,
         goal_conditions=goals,
+        invariants=invariants,
+        hard_constraints=hard_constraints,
         description=instance.natural_language_prompt,
     )
 
