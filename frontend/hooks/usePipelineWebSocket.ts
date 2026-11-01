@@ -75,6 +75,69 @@ const initialState: PipelineAccumulatedState = {
   graphStatus: "IDLE",
 };
 
+function normalizeGraphNode(n: any): GraphNode {
+  const id = n.id || n.node_id || "";
+  const is_boundary = Boolean(n.is_boundary || n.is_truncated_boundary || n.partially_expanded);
+  return {
+    id,
+    node_id: id,
+    state_hash: n.state_hash || id,
+    depth: typeof n.depth === "number" ? n.depth : 0,
+    is_initial: Boolean(n.is_initial),
+    is_goal: Boolean(n.is_goal),
+    is_dead_end: Boolean(n.is_dead_end),
+    is_boundary,
+    is_truncated_boundary: is_boundary,
+    facts: Array.isArray(n.facts) ? n.facts : [],
+    facts_summary: Array.isArray(n.facts_summary)
+      ? n.facts_summary
+      : (Array.isArray(n.facts)
+          ? n.facts.slice(0, 6).map((f: any) => typeof f === "string" ? f : `${f.predicate}(${f.arguments?.join(", ")})`)
+          : []),
+    summary: n.summary || "",
+    incoming_edges_count: n.incoming_edges_count,
+    outgoing_edges_count: n.outgoing_edges_count,
+  };
+}
+
+function normalizeGraphEdge(e: any): GraphEdge {
+  const source = e.source || e.source_id || "";
+  const target = e.target || e.target_id || "";
+  const id = e.id || e.edge_id || `${source}->${target}`;
+  return {
+    id,
+    source,
+    source_id: source,
+    target,
+    target_id: target,
+    action_name: e.action_name || "",
+    action_args: Array.isArray(e.action_args) ? e.action_args : [],
+    action_label: e.action_label || e.label || e.action_name || "",
+    cost: typeof e.cost === "number" ? e.cost : 1.0,
+    is_cycle: Boolean(e.is_cycle),
+    is_plan_edge: Boolean(e.is_plan_edge),
+    is_repaired_edge: Boolean(e.is_repaired_edge),
+  };
+}
+
+function normalizeGraphStats(s: any): GraphStats | undefined {
+  if (!s) return undefined;
+  const max_depth = typeof s.max_depth === "number" ? s.max_depth : (typeof s.max_depth_reached === "number" ? s.max_depth_reached : 0);
+  return {
+    total_nodes: typeof s.total_nodes === "number" ? s.total_nodes : 0,
+    total_edges: typeof s.total_edges === "number" ? s.total_edges : 0,
+    max_depth,
+    max_depth_reached: max_depth,
+    goal_node_ids: Array.isArray(s.goal_node_ids) ? s.goal_node_ids : [],
+    dead_end_node_ids: Array.isArray(s.dead_end_node_ids) ? s.dead_end_node_ids : [],
+    is_complete: Boolean(s.is_complete),
+    truncation_reason: s.truncation_reason ?? null,
+    enumeration_time_ms: typeof s.enumeration_time_ms === "number" ? s.enumeration_time_ms : 0,
+    duplicate_states_pruned: s.duplicate_states_pruned,
+    cycles_detected: s.cycles_detected,
+  };
+}
+
 export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080") {
   const [isStreaming, setIsStreaming] = useState(false);
   const [events, setEvents] = useState<PipelineStreamEvent[]>([]);
@@ -154,25 +217,29 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080
                 graphStats: undefined,
               }));
             } else if (data.stage === "GRAPH_NODE_BATCH") {
+              const rawNodes = data.data.nodes || [];
+              const normalized = rawNodes.map(normalizeGraphNode);
               setState((prev) => ({
                 ...prev,
-                graphNodes: [...prev.graphNodes, ...(data.data.nodes || [])],
+                graphNodes: [...prev.graphNodes, ...normalized],
               }));
             } else if (data.stage === "GRAPH_EDGE_BATCH") {
+              const rawEdges = data.data.edges || [];
+              const normalized = rawEdges.map(normalizeGraphEdge);
               setState((prev) => ({
                 ...prev,
-                graphEdges: [...prev.graphEdges, ...(data.data.edges || [])],
+                graphEdges: [...prev.graphEdges, ...normalized],
               }));
             } else if (data.stage === "GRAPH_ENUMERATION_COMPLETED") {
               setState((prev) => ({
                 ...prev,
-                graphStats: data.data.stats,
+                graphStats: normalizeGraphStats(data.data.stats),
                 graphStatus: "COMPLETED",
               }));
             } else if (data.stage === "GRAPH_ENUMERATION_TRUNCATED") {
               setState((prev) => ({
                 ...prev,
-                graphStats: data.data.stats,
+                graphStats: normalizeGraphStats(data.data.stats),
                 graphStatus: "TRUNCATED",
               }));
             } else if (data.stage === "BACKTRACK") {

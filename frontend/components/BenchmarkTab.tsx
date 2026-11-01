@@ -1,14 +1,39 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Play, BarChart3, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { getApiBaseUrl } from "../utils/api";
+
+const MATRIX_CLASSES = [
+  { key: "PLANNING_ERROR", label: "PLANNING" },
+  { key: "PERCEPTION_ERROR", label: "PERCEPTION" },
+  { key: "FORMALIZATION_ERROR", label: "FORMAL" },
+  { key: "ENVIRONMENT_CHANGE", label: "ENV_DELTA" },
+  { key: "UNKNOWN_AMBIGUOUS", label: "UNKNOWN" },
+];
 
 export function BenchmarkTab() {
   const [instances, setInstances] = useState(5);
   const [seed, setSeed] = useState(42);
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [attributionData, setAttributionData] = useState<any>(null);
+
+  const fetchAttribution = async () => {
+    try {
+      const resp = await fetch(`${getApiBaseUrl()}/api/benchmark/attribution`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setAttributionData(data);
+      }
+    } catch (e) {
+      console.warn("Could not load attribution matrix:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttribution();
+  }, []);
 
   const runBenchmark = async () => {
     setIsRunning(true);
@@ -21,6 +46,7 @@ export function BenchmarkTab() {
       if (resp.ok) {
         const data = await resp.json();
         setResults(data);
+        await fetchAttribution();
       }
     } catch (e) {
       console.error("Benchmark error:", e);
@@ -130,74 +156,90 @@ export function BenchmarkTab() {
                 Hypothesis Empirically Evaluated
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-300">
-              Generic regeneration (Baseline B3: active candidate sequence re-sampling) achieves partial recovery (
-              <strong className="text-amber-300">
-                {((results.summary["B3_GenericRegeneration"]?.repair_success_rate ?? 0) * 100).toFixed(1)}%
-              </strong>
-              ), whereas RE-PLAN-V's counterexample-guided pruning systematically recovers from initially invalid plans (
-              <strong className="text-emerald-400">
-                {((results.summary["OURS_CounterexampleRepair"]?.repair_success_rate ?? 0) * 100).toFixed(1)}%
-              </strong>
-              ) with a measured recovery advantage of{" "}
-              <strong className="text-cyan-300">
-                +{(((results.summary["OURS_CounterexampleRepair"]?.repair_success_rate ?? 0) - (results.summary["B3_GenericRegeneration"]?.repair_success_rate ?? 0)) * 100).toFixed(1)}%
-              </strong>
-              .
-            </p>
+            {(() => {
+              const oursRate = results.summary["OURS_CounterexampleRepair"]?.repair_success_rate;
+              const b3Rate = results.summary["B3_GenericRegeneration"]?.repair_success_rate;
+              const hasAdvantage = typeof oursRate === "number" && typeof b3Rate === "number";
+              const advDiff = hasAdvantage ? (oursRate - b3Rate) * 100 : null;
+              return (
+                <p className="mt-1 text-xs text-slate-300">
+                  Generic regeneration (Baseline B3: active candidate sequence re-sampling) achieves recovery of{" "}
+                  <strong className="text-amber-300">
+                    {typeof b3Rate === "number" ? `${(b3Rate * 100).toFixed(1)}%` : "N/A"}
+                  </strong>
+                  , whereas RE-PLAN-V's counterexample-guided pruning achieves{" "}
+                  <strong className="text-emerald-400">
+                    {typeof oursRate === "number" ? `${(oursRate * 100).toFixed(1)}%` : "N/A"}
+                  </strong>
+                  {advDiff !== null && (
+                    <>
+                      {" "}with a measured recovery advantage of{" "}
+                      <strong className="text-cyan-300">
+                        {advDiff > 0 ? "+" : ""}{advDiff.toFixed(1)}%
+                      </strong>
+                    </>
+                  )}
+                  .
+                </p>
+              );
+            })()}
           </div>
 
           {/* 5-Class Fault Attribution Confusion Matrix */}
           <div className="mt-6 border-t border-slate-800 pt-6">
-            <h4 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-slate-300">
-              5-Class Fault Attribution Confusion Matrix (Controlled Fault Injection)
-            </h4>
-            <div className="grid grid-cols-6 gap-1 text-center font-mono text-[10px]">
-              <div className="p-2 text-slate-500 font-bold">GT \ Pred</div>
-              <div className="p-2 bg-slate-800/40 text-slate-300 font-bold">PLANNING</div>
-              <div className="p-2 bg-slate-800/40 text-slate-300 font-bold">PERCEPTION</div>
-              <div className="p-2 bg-slate-800/40 text-slate-300 font-bold">FORMAL</div>
-              <div className="p-2 bg-slate-800/40 text-slate-300 font-bold">ENV_DELTA</div>
-              <div className="p-2 bg-slate-800/40 text-slate-300 font-bold">UNKNOWN</div>
-
-              <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">PLANNING</div>
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 rounded">10</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-
-              <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">PERCEPTION</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 rounded">10</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-
-              <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">FORMAL</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 rounded">10</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-
-              <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">ENV_DELTA</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 rounded">10</div>
-              <div className="p-2 text-slate-600">0</div>
-
-              <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">UNKNOWN</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 text-slate-600">0</div>
-              <div className="p-2 bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30 rounded">10</div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-mono text-xs font-semibold uppercase tracking-wider text-slate-300">
+                5-Class Fault Attribution Confusion Matrix (Controlled Fault Injection)
+              </h4>
+              {attributionData && (
+                <span className="font-mono text-[11px] text-slate-400">
+                  Macro Accuracy: <strong className="text-emerald-400">{(attributionData.accuracy * 100).toFixed(1)}%</strong> | Macro F1: <strong className="text-emerald-400">{attributionData.macro_f1.toFixed(2)}</strong> ({attributionData.total_evaluated} Ground Truth Trials)
+                </span>
+              )}
             </div>
-            <div className="mt-2 text-right text-[11px] text-slate-400">
-              Macro Accuracy: <strong className="text-emerald-400">100.0%</strong> | Macro F1: <strong className="text-emerald-400">1.00</strong> (50 Ground Truth Trials)
-            </div>
+
+            {attributionData && attributionData.confusion_matrix ? (
+              <div className="grid grid-cols-6 gap-1 text-center font-mono text-[10px]">
+                <div className="p-2 text-slate-500 font-bold">GT \ Pred</div>
+                {MATRIX_CLASSES.map((col) => (
+                  <div key={col.key} className="p-2 bg-slate-800/40 text-slate-300 font-bold">
+                    {col.label}
+                  </div>
+                ))}
+
+                {MATRIX_CLASSES.map((row) => (
+                  <React.Fragment key={row.key}>
+                    <div className="p-2 bg-slate-800/40 text-left font-bold text-slate-300">
+                      {row.label}
+                    </div>
+                    {MATRIX_CLASSES.map((col) => {
+                      const count = attributionData.confusion_matrix?.[row.key]?.[col.key] ?? 0;
+                      const isDiagonal = row.key === col.key;
+                      const isCorrect = isDiagonal && count > 0;
+                      const isError = !isDiagonal && count > 0;
+                      return (
+                        <div
+                          key={col.key}
+                          className={`p-2 rounded font-bold ${
+                            isCorrect
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : isError
+                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                              : "text-slate-600"
+                          }`}
+                        >
+                          {count}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-800 p-4 text-center text-xs text-slate-500">
+                Loading attribution experimental results...
+              </div>
+            )}
           </div>
         </div>
       )}

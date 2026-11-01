@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Navbar, NavTab } from "../components/Navbar";
 import { TaskControlPanel } from "../components/TaskControlPanel";
 import { TabletopCanvas } from "../components/TabletopCanvas";
+import { SymbolicStateInspector } from "../components/SymbolicStateInspector";
 import { ExecutionStepper } from "../components/ExecutionStepper";
 import { StateSpaceExplorer } from "../components/StateSpaceExplorer";
 import { DomainStudio } from "../components/DomainStudio";
@@ -109,13 +110,25 @@ export default function Home() {
                   externalPrompt={currentPrompt}
                   externalDomainId={selectedDomain}
                 />
-                <TabletopCanvas
-                  entities={state.entities}
-                  initialFacts={state.initialFacts}
-                  finalPlan={state.finalPlan}
-                  isStreaming={isStreaming}
-                  prompt={currentPrompt}
-                />
+                {selectedDomain === "blocks_world" || (selectedDomain === "auto" && (!state.domainId || state.domainId === "blocks_world")) ? (
+                  <TabletopCanvas
+                    entities={state.entities}
+                    initialFacts={state.initialFacts}
+                    finalPlan={state.finalPlan}
+                    isStreaming={isStreaming}
+                    prompt={currentPrompt}
+                  />
+                ) : (
+                  <SymbolicStateInspector
+                    domainId={selectedDomain !== "auto" ? selectedDomain : (state.domainId || "blocks_world")}
+                    entities={state.entities}
+                    initialFacts={state.initialFacts}
+                    goalFacts={state.goalFacts}
+                    negativeConstraints={state.negativeConstraints}
+                    finalPlan={state.finalPlan}
+                    isStreaming={isStreaming}
+                  />
+                )}
               </div>
 
               {/* Right Column: Live Execution Trace Stepper */}

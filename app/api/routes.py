@@ -64,6 +64,7 @@ def run_benchmark(req: BenchmarkRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/benchmark/attribution")
 @router.get("/benchmark/attribution_matrix")
 def get_attribution_matrix() -> Dict[str, Any]:
     """Returns the latest 5-class fault attribution confusion matrix report."""

@@ -127,7 +127,7 @@ export function StateSpaceExplorer({
         dead_end_node_ids: parsedNodes.filter(n => n.is_dead_end).map(n => n.id),
         is_complete: false,
         truncation_reason: "STATS_OMITTED_BY_BACKEND",
-        enumeration_time_ms: 120,
+        enumeration_time_ms: 0.0,
       });
 
       if (parsedNodes.length > 0) {
@@ -200,7 +200,7 @@ export function StateSpaceExplorer({
 
       if (query) {
         const matchesId = node.id.toLowerCase().includes(query);
-        const matchesHash = node.state_hash.toLowerCase().includes(query);
+        const matchesHash = Boolean(node.state_hash && node.state_hash.toLowerCase().includes(query));
         const matchesFacts = (node.facts_summary || []).some((f) =>
           f.toLowerCase().includes(query)
         );
@@ -695,18 +695,18 @@ export function StateSpaceExplorer({
                   Canonical SHA-256 Hash
                 </span>
                 <span className="font-mono text-[11px] text-cyan-300 break-all select-all">
-                  {selectedNode.state_hash}
+                  {selectedNode.state_hash || selectedNode.id}
                 </span>
               </div>
 
               {/* Active Symbolic Facts */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Active Symbolic Facts ({selectedNode.facts_summary.length})
+                  Active Symbolic Facts ({(selectedNode.facts_summary || []).length})
                 </span>
                 <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 p-2.5 flex flex-col gap-1">
-                  {selectedNode.facts_summary.length > 0 ? (
-                    selectedNode.facts_summary.map((factStr, idx) => (
+                  {(selectedNode.facts_summary || []).length > 0 ? (
+                    (selectedNode.facts_summary || []).map((factStr, idx) => (
                       <span
                         key={idx}
                         className="font-mono text-xs text-emerald-300 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-900/30"

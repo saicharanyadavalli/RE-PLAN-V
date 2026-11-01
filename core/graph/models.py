@@ -9,12 +9,14 @@ from pydantic import BaseModel, Field
 class GraphNode(BaseModel):
     """Represents a unique semantic symbolic state in the reachable graph."""
     node_id: str
+    id: Optional[str] = None
     facts: List[str]
     depth: int = 0
     is_initial: bool = False
     is_goal: bool = False
     is_dead_end: bool = False
     is_boundary: bool = False
+    is_truncated_boundary: Optional[bool] = None
     expanded: bool = False
     partially_expanded: bool = False
     summary: str = ""
@@ -22,18 +24,38 @@ class GraphNode(BaseModel):
     h_cost: Optional[float] = None
     f_cost: Optional[float] = None
 
+    def model_post_init(self, __context: Any) -> None:
+        if self.id is None:
+            self.id = self.node_id
+        if self.is_truncated_boundary is None:
+            self.is_truncated_boundary = self.is_boundary or self.partially_expanded
+
 
 class GraphEdge(BaseModel):
     """Represents an authoritative directed transition between two symbolic states."""
     edge_id: str
+    id: Optional[str] = None
     source_id: str
+    source: Optional[str] = None
     target_id: str
+    target: Optional[str] = None
     action_name: str
     action_args: List[str]
     action_label: str
+    label: Optional[str] = None
     cost: float = 1.0
     is_plan_edge: bool = False
     is_repaired_edge: bool = False
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.id is None:
+            self.id = self.edge_id
+        if self.source is None:
+            self.source = self.source_id
+        if self.target is None:
+            self.target = self.target_id
+        if self.label is None:
+            self.label = self.action_label
 
 
 class GraphStats(BaseModel):
@@ -44,11 +66,16 @@ class GraphStats(BaseModel):
     goal_node_ids: List[str] = Field(default_factory=list)
     dead_end_node_ids: List[str] = Field(default_factory=list)
     max_depth: int = 0
+    max_depth_reached: Optional[int] = None
     is_complete: bool = False
     truncation_reason: Optional[str] = None
     enumeration_time_ms: float = 0.0
     duplicate_states_pruned: int = 0
     cycles_detected: int = 0
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.max_depth_reached is None:
+            self.max_depth_reached = self.max_depth
 
 
 class ReachableStateGraph(BaseModel):
@@ -78,15 +105,18 @@ class ReachableStateGraph(BaseModel):
             cy_elements.append({
                 "data": {
                     "id": n.node_id,
+                    "node_id": n.node_id,
                     "label": f"S{n.depth}: {n.summary[:24]}" if n.summary else n.node_id[:8],
                     "depth": n.depth,
                     "is_initial": n.is_initial,
                     "is_goal": n.is_goal,
                     "is_dead_end": n.is_dead_end,
                     "is_boundary": n.is_boundary or n.partially_expanded,
+                    "is_truncated_boundary": n.is_boundary or n.partially_expanded,
                     "partially_expanded": n.partially_expanded,
                     "expanded": n.expanded,
                     "facts": n.facts,
+                    "facts_summary": n.facts[:6],
                 },
                 "classes": " ".join(classes),
             })
@@ -96,8 +126,14 @@ class ReachableStateGraph(BaseModel):
             cy_elements.append({
                 "data": {
                     "id": e.edge_id,
+                    "edge_id": e.edge_id,
                     "source": e.source_id,
+                    "source_id": e.source_id,
                     "target": e.target_id,
+                    "target_id": e.target_id,
+                    "action_name": e.action_name,
+                    "action_args": e.action_args,
+                    "action_label": e.action_label,
                     "label": e.action_label,
                     "cost": e.cost,
                     "is_plan_edge": e.is_plan_edge,
@@ -106,11 +142,15 @@ class ReachableStateGraph(BaseModel):
                 "classes": "plan_edge" if e.is_plan_edge else "regular_edge",
             })
 
+        stats_data = self.stats.model_dump()
+        stats_data["max_depth_reached"] = self.stats.max_depth
+        stats_data["max_depth"] = self.stats.max_depth
+
         return {
             "format": "cytoscape",
             "graph_id": self.graph_id,
             "domain_id": self.domain_id,
             "problem_name": self.problem_name,
-            "stats": self.stats.model_dump(),
+            "stats": stats_data,
             "elements": cy_elements,
         }

@@ -11,36 +11,50 @@ export interface GroundActionSchema {
 
 export interface GraphNode {
   id: string;
-  state_hash: string;
+  node_id?: string;
+  state_hash?: string;
   depth: number;
   is_initial: boolean;
   is_goal: boolean;
   is_dead_end: boolean;
+  is_boundary?: boolean;
   is_truncated_boundary: boolean;
-  facts: FactSchema[];
+  facts: FactSchema[] | string[];
   facts_summary: string[];
+  summary?: string;
   incoming_edges_count?: number;
   outgoing_edges_count?: number;
 }
 
 export interface GraphEdge {
+  id?: string;
+  edge_id?: string;
   source: string;
+  source_id?: string;
   target: string;
+  target_id?: string;
   action_name: string;
   action_args: string[];
+  action_label?: string;
+  label?: string;
   cost: number;
-  is_cycle: boolean;
+  is_cycle?: boolean;
+  is_plan_edge?: boolean;
+  is_repaired_edge?: boolean;
 }
 
 export interface GraphStats {
   total_nodes: number;
   total_edges: number;
+  max_depth?: number;
   max_depth_reached: number;
   goal_node_ids: string[];
   dead_end_node_ids: string[];
   is_complete: boolean;
   truncation_reason?: string | null;
   enumeration_time_ms: number;
+  duplicate_states_pruned?: number;
+  cycles_detected?: number;
 }
 
 export interface ReachableStateGraph {
