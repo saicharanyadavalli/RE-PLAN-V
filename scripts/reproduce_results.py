@@ -87,21 +87,42 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print(f"\n[4/4] Evaluating Multi-Domain Complexity Tier Coverage (6 Domains with Model B Measurement)...")
     from benchmark.generator.multi_domain_generator import MultiDomainBenchmarkGenerator, ComplexityTier
     tier_gen = MultiDomainBenchmarkGenerator(seed=seed)
-    tier_instances = tier_gen.generate_suite(instances_per_domain=1, measure_all=True)
-    print("\n" + "-" * 88)
-    print(f"{'Domain ID':<22} | {'Tier':<8} | {'Measured States':<17} | {'Transitions':<12} | {'Sample Goal'}")
-    print("-" * 88)
+    # Generate representative suite spanning TINY, MEDIUM, and LARGE tiers across domains
+    representative_tiers = [
+        ("blocks_world", ComplexityTier.TINY),
+        ("blocks_world", ComplexityTier.MEDIUM),
+        ("blocks_world", ComplexityTier.LARGE),
+        ("grid_world", ComplexityTier.TINY),
+        ("grid_world", ComplexityTier.MEDIUM),
+        ("grid_world", ComplexityTier.LARGE),
+        ("household_robotics", ComplexityTier.TINY),
+        ("household_robotics", ComplexityTier.LARGE),
+        ("warehouse", ComplexityTier.TINY),
+        ("warehouse", ComplexityTier.LARGE),
+        ("scheduling", ComplexityTier.TINY),
+        ("scheduling", ComplexityTier.LARGE),
+        ("software_workflow", ComplexityTier.TINY),
+        ("software_workflow", ComplexityTier.SMALL),
+    ]
+    tier_instances = [
+        tier_gen.generate_by_tier(tier=t, domain_id=d, measure_now=True)
+        for d, t in representative_tiers
+    ]
+    print("\n" + "-" * 105)
+    print(f"{'Domain ID':<20} | {'Tier':<8} | {'Est. Bound':<11} | {'Measured States':<17} | {'Transitions':<12} | {'Status':<10} | {'Sample Goal'}")
+    print("-" * 105)
     for ti in tier_instances:
         goal_str = ", ".join(f"{g['predicate']}({','.join(g['arguments'])})" for g in ti.goal_conditions)
-        states_str = f"{ti.measured_unique_states} states" if ti.is_complete else f"{ti.measured_unique_states} (trunc)"
-        print(f"{ti.domain_id:<22} | {ti.tier.value:<8} | {states_str:<17} | {ti.measured_edges or 0:<12} | {goal_str[:25]}")
-    print("-" * 88)
+        states_str = f"{ti.measured_unique_states} states"
+        status_str = "Complete" if ti.is_complete else "Truncated"
+        print(f"{ti.domain_id:<20} | {ti.tier.value:<8} | {ti.estimated_state_space:<11} | {states_str:<17} | {ti.measured_edges or 0:<12} | {status_str:<10} | {goal_str[:22]}")
+    print("-" * 105)
 
     # Save summary report
     elapsed = time.perf_counter() - start_time
     output_file = Path("evaluation/reports/full_reproduction_summary.json")
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
+    with open(output_file, "w", encoding="utf-8", newline="\n") as f:
         json.dump(
             {
                 "timestamp": primary_results.get("timestamp", time.time()),

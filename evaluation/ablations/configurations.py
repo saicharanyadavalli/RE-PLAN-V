@@ -57,19 +57,22 @@ class AblationStudyRunner:
             res["ablation"] = "full"
             return res
 
-        # 2. Without verifier (blind acceptance)
+        # 2. Without verifier (candidate is accepted without verification gate; actual success measured post-hoc)
         elif abl == "without_verifier":
             problem = instance_to_problem(instance, domain)
             candidate = initial_candidate or self.full_system.engine.planner.search(problem, domain)
+            # Evaluate ground-truth validity post-hoc to measure unverified execution success
+            eval_res = self.full_system.engine.verifier.verify(problem, domain, candidate)
             return {
                 "ablation": "without_verifier",
-                "is_valid": True,  # Blindly trusted without formal verification
-                "success": True,
-                "plan_cost": candidate.total_cost,
+                "is_valid": eval_res.is_valid,
+                "success": eval_res.is_valid,
+                "plan_cost": candidate.total_cost if eval_res.is_valid else float("inf"),
                 "planning_time_ms": candidate.planning_time_ms,
-                "verification_time_ms": 0.0,
+                "verification_time_ms": 0.0,  # Ablation skipped verification during execution
                 "nodes_expanded": candidate.nodes_expanded,
                 "repair_iterations": 0,
+                "final_verification": eval_res,
             }
 
         # 3. Without repair (verifier catches error, but no repair is attempted)

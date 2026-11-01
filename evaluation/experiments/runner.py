@@ -114,7 +114,7 @@ class ExperimentRunner:
 
         # Export report to JSON
         report_path = self.output_dir / "primary_research_experiment.json"
-        with open(report_path, "w", encoding="utf-8") as f:
+        with open(report_path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(results, f, indent=2)
 
         return results

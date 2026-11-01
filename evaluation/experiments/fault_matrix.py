@@ -87,6 +87,7 @@ class AttributionMatrixExperiment:
         suffix = f"_{fault_class.value[:3]}_{idx}"
         problem, domain = self._create_sample_problem(suffix)
         b1, b2, b3 = f"b1{suffix}", f"b2{suffix}", f"b3{suffix}"
+        default_prompt = f"Stack {b1} on {b2}."
 
         if fault_class == FaultClass.PLANNING_ERROR:
             broken_plan = [GroundActionSchema(name="stack", arguments=(b1, b2))]
@@ -97,6 +98,7 @@ class AttributionMatrixExperiment:
                 "ground_truth": FaultClass.PLANNING_ERROR,
                 "counterexample": cex,
                 "problem": problem,
+                "natural_language_prompt": default_prompt,
             }
 
         elif fault_class == FaultClass.PERCEPTION_ERROR:
@@ -109,13 +111,15 @@ class AttributionMatrixExperiment:
                 actual_truth=False,
                 failure_category=ViolationType.PRECONDITION_UNMET,
                 affected_entities=[b1],
-                state_snapshot=SymbolicStateSchema(),
+                state_snapshot=problem.initial_state.to_schema(),
             )
             observed = [FactSchema(predicate="clear", arguments=(b1,))]
             ground_truth = [FactSchema(predicate="on", arguments=(b2, b1))]
             return {
                 "ground_truth": FaultClass.PERCEPTION_ERROR,
                 "counterexample": cex,
+                "problem": problem,
+                "natural_language_prompt": f"Pick up {b1}.",
                 "observed_facts": observed,
                 "ground_truth_facts": ground_truth,
             }
@@ -150,7 +154,7 @@ class AttributionMatrixExperiment:
                 actual_truth=False,
                 failure_category=ViolationType.PRECONDITION_UNMET,
                 affected_entities=[b1],
-                state_snapshot=SymbolicStateSchema(),
+                state_snapshot=problem.initial_state.to_schema(),
             )
             delta = WorldDeltaSchema(
                 delta_id=f"DELTA-{idx}",
@@ -162,25 +166,82 @@ class AttributionMatrixExperiment:
             return {
                 "ground_truth": FaultClass.ENVIRONMENT_CHANGE,
                 "counterexample": cex,
+                "problem": problem,
+                "natural_language_prompt": default_prompt,
                 "environment_deltas": [delta],
             }
 
         else:  # UNKNOWN_AMBIGUOUS
-            cex = CounterexampleSchema(
-                counterexample_id=f"CEX-UNK-{idx}",
-                action_index=0,
-                offending_action=GroundActionSchema(name="noop", arguments=()),
-                violated_condition=FactSchema(predicate="undefined_condition", arguments=()),
-                expected_truth=True,
-                actual_truth=False,
-                failure_category=ViolationType.NONE,
-                affected_entities=[],
-                state_snapshot=SymbolicStateSchema(),
-            )
-            return {
-                "ground_truth": FaultClass.UNKNOWN_AMBIGUOUS,
-                "counterexample": cex,
-            }
+            variant = idx % 3
+            if variant == 0:
+                # Realistic Ambiguity Type 1: Simultaneous conflicting environment delta AND perception discrepancy
+                cex = CounterexampleSchema(
+                    counterexample_id=f"CEX-UNK-CONF-{idx}",
+                    action_index=1,
+                    offending_action=GroundActionSchema(name="pick_up", arguments=(b1,)),
+                    violated_condition=FactSchema(predicate="clear", arguments=(b1,)),
+                    expected_truth=True,
+                    actual_truth=False,
+                    failure_category=ViolationType.PRECONDITION_UNMET,
+                    affected_entities=[b1],
+                    state_snapshot=problem.initial_state.to_schema(),
+                )
+                delta = WorldDeltaSchema(
+                    delta_id=f"DELTA-CONF-{idx}",
+                    added_facts=[FactSchema(predicate="on", arguments=(b3, b1))],
+                    removed_facts=[FactSchema(predicate="clear", arguments=(b1,))],
+                    affected_entities=[b1],
+                    is_plan_invalidating=True,
+                )
+                observed = [FactSchema(predicate="clear", arguments=(b1,))]
+                ground_truth = [FactSchema(predicate="on", arguments=(b2, b1))]
+                return {
+                    "ground_truth": FaultClass.UNKNOWN_AMBIGUOUS,
+                    "counterexample": cex,
+                    "problem": problem,
+                    "natural_language_prompt": default_prompt,
+                    "observed_facts": observed,
+                    "ground_truth_facts": ground_truth,
+                    "environment_deltas": [delta],
+                }
+            elif variant == 1:
+                # Realistic Ambiguity Type 2: Non-standard violation with undefined condition and missing telemetry
+                cex = CounterexampleSchema(
+                    counterexample_id=f"CEX-UNK-UNDEF-{idx}",
+                    action_index=0,
+                    offending_action=GroundActionSchema(name="noop", arguments=()),
+                    violated_condition=FactSchema(predicate="undefined_condition", arguments=()),
+                    expected_truth=True,
+                    actual_truth=False,
+                    failure_category=ViolationType.NONE,
+                    affected_entities=[],
+                    state_snapshot=SymbolicStateSchema(),
+                )
+                return {
+                    "ground_truth": FaultClass.UNKNOWN_AMBIGUOUS,
+                    "counterexample": cex,
+                    "problem": problem,
+                    "natural_language_prompt": "Perform autonomous task.",
+                }
+            else:
+                # Realistic Ambiguity Type 3: Unclear intent with missing state telemetry
+                cex = CounterexampleSchema(
+                    counterexample_id=f"CEX-UNK-UNCLEAR-{idx}",
+                    action_index=0,
+                    offending_action=GroundActionSchema(name="noop", arguments=()),
+                    violated_condition=FactSchema(predicate="untracked_sensor_reading", arguments=(b1,)),
+                    expected_truth=True,
+                    actual_truth=False,
+                    failure_category=ViolationType.NONE,
+                    affected_entities=[b1],
+                    state_snapshot=SymbolicStateSchema(),
+                )
+                return {
+                    "ground_truth": FaultClass.UNKNOWN_AMBIGUOUS,
+                    "counterexample": cex,
+                    "problem": problem,
+                    "natural_language_prompt": f"Please be careful with {b1} while arranging items.",
+                }
 
     def run_evaluation(self, instances_per_class: int = 5, seed: int = 42) -> Dict[str, Any]:
         """Runs the attribution matrix evaluation across all 5 classes."""
@@ -235,6 +296,8 @@ class AttributionMatrixExperiment:
         macro_prec = sum(p["precision"] for p in per_class.values()) / len(class_names)
         macro_rec = sum(p["recall"] for p in per_class.values()) / len(class_names)
         macro_f1 = sum(p["f1_score"] for p in per_class.values()) / len(class_names)
+        abstentions = sum(matrix[other]["UNKNOWN_AMBIGUOUS"] for other in class_names if other != "UNKNOWN_AMBIGUOUS")
+        abstention_rate = abstentions / max(1, total)
 
         results = {
             "experiment": "5-Class Fault Attribution Matrix & Precision-Recall Analysis",
@@ -243,12 +306,14 @@ class AttributionMatrixExperiment:
             "macro_precision": round(macro_prec, 4),
             "macro_recall": round(macro_rec, 4),
             "macro_f1": round(macro_f1, 4),
+            "abstentions": abstentions,
+            "abstention_rate": round(abstention_rate, 4),
             "per_class": per_class,
             "confusion_matrix": matrix,
         }
 
         report_file = self.output_dir / "fault_attribution_matrix.json"
-        with open(report_file, "w", encoding="utf-8") as f:
+        with open(report_file, "w", encoding="utf-8", newline="\n") as f:
             json.dump(results, f, indent=2)
 
         return results

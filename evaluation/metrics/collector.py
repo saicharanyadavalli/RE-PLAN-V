@@ -63,9 +63,9 @@ class MetricsCollector:
             # Baseline methods that don't do attribution report 0.0
             attr_acc = 0.0
 
-        # Empirical recovery advantage over generic regeneration baseline
+        # Empirical recovery advantage over generic regeneration baseline (signed difference)
         if self.baseline_regeneration_rate is not None:
-            rec_adv = max(0.0, repair_rate - self.baseline_regeneration_rate)
+            rec_adv = round(repair_rate - self.baseline_regeneration_rate, 4)
         else:
             rec_adv = 0.0
 

@@ -171,25 +171,38 @@ class MultiDomainBenchmarkGenerator:
         )
 
     def _gen_grid_world(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        cell_counts = {
-            ComplexityTier.TINY: 4,
-            ComplexityTier.SMALL: 8,
-            ComplexityTier.MEDIUM: 16,
-            ComplexityTier.LARGE: 32,
-            ComplexityTier.STRESS: 64,
+        # Scale locations and items across tiers
+        tier_configs = {
+            ComplexityTier.TINY: (4, 0),    # 4 cells, 0 items (~4 states)
+            ComplexityTier.SMALL: (6, 1),   # 6 cells, 1 item (~36 states)
+            ComplexityTier.MEDIUM: (6, 2),  # 6 cells, 2 items (~288 states)
+            ComplexityTier.LARGE: (8, 2),   # 8 cells, 2 items (~648 states)
+            ComplexityTier.STRESS: (8, 3),  # 8 cells, 3 items (~5832 states; tests bound truncation)
         }
-        n = cell_counts.get(tier, 6)
+        n_locs, n_items = tier_configs.get(tier, (6, 1))
         entities = {"agent": "agent"}
-        for i in range(1, n + 1):
+        for i in range(1, n_locs + 1):
             entities[f"c{i}"] = "location"
+        for j in range(1, n_items + 1):
+            entities[f"item_{j}"] = "item"
 
         init_facts = [{"predicate": "at", "arguments": ["agent", "c1"]}]
-        for i in range(1, n):
+        for i in range(1, n_locs):
             init_facts.append({"predicate": "connected", "arguments": [f"c{i}", f"c{i+1}"]})
             init_facts.append({"predicate": "connected", "arguments": [f"c{i+1}", f"c{i}"]})
 
-        goal_facts = [{"predicate": "at", "arguments": ["agent", f"c{n}"]}]
-        prompt = f"Navigate agent from c1 to destination cell c{n} across a {n}-cell grid."
+        if n_items > 0:
+            init_facts.append({"predicate": "agent_free", "arguments": ["agent"]})
+            for j in range(1, n_items + 1):
+                loc = f"c{min(j + 1, n_locs)}"
+                init_facts.append({"predicate": "item_at", "arguments": [f"item_{j}", loc]})
+            goal_facts = [{"predicate": "item_at", "arguments": ["item_1", f"c{n_locs}"]}]
+            prompt = f"Navigate agent and transport item_1 to destination cell c{n_locs} in {tier.value} grid configuration."
+        else:
+            goal_facts = [{"predicate": "at", "arguments": ["agent", f"c{n_locs}"]}]
+            prompt = f"Navigate agent from c1 to destination cell c{n_locs} across a {n_locs}-cell grid."
+
+        est_states = n_locs * ((n_locs + 1) ** n_items)
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="grid_world",
@@ -198,42 +211,51 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=n,
+            estimated_state_space=est_states,
         )
 
     def _gen_household(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        # Scale rooms and items by tier
-        item_counts = {
-            ComplexityTier.TINY: 1,
-            ComplexityTier.SMALL: 2,
-            ComplexityTier.MEDIUM: 3,
-            ComplexityTier.LARGE: 4,
-            ComplexityTier.STRESS: 5,
+        # Scale rooms, surfaces, and items by tier
+        tier_configs = {
+            ComplexityTier.TINY: (2, 2, 1),   # 2 rooms, 2 surfaces, 1 item (~6 states)
+            ComplexityTier.SMALL: (2, 2, 2),  # 2 rooms, 2 surfaces, 2 items (~16 states)
+            ComplexityTier.MEDIUM: (3, 3, 2), # 3 rooms, 3 surfaces, 2 items (~45 states)
+            ComplexityTier.LARGE: (3, 4, 3),  # 3 rooms, 4 surfaces, 3 items (~375 states)
+            ComplexityTier.STRESS: (4, 5, 4), # 4 rooms, 5 surfaces, 4 items (>1500 states)
         }
-        num_items = item_counts.get(tier, 1)
-        entities = {
-            "robot": "robot",
-            "kitchen": "room",
-            "living_room": "room",
-            "shelf": "surface",
-            "table": "surface",
-        }
-        for i in range(1, num_items + 1):
+        n_rooms, n_surfaces, n_items = tier_configs.get(tier, (2, 2, 1))
+        entities = {"robot": "robot"}
+        room_names = ["kitchen", "living_room", "bedroom", "office"][:n_rooms]
+        surface_names = ["shelf", "table", "desk", "counter", "nightstand"][:n_surfaces]
+
+        for r in room_names:
+            entities[r] = "room"
+        for s in surface_names:
+            entities[s] = "surface"
+        for i in range(1, n_items + 1):
             entities[f"item_{i}"] = "item"
 
         init_facts = [
-            {"predicate": "robot_at", "arguments": ["robot", "kitchen"]},
-            {"predicate": "connected_rooms", "arguments": ["kitchen", "living_room"]},
-            {"predicate": "connected_rooms", "arguments": ["living_room", "kitchen"]},
-            {"predicate": "surface_in_room", "arguments": ["shelf", "kitchen"]},
-            {"predicate": "surface_in_room", "arguments": ["table", "living_room"]},
+            {"predicate": "robot_at", "arguments": ["robot", room_names[0]]},
             {"predicate": "gripper_empty", "arguments": ["robot"]},
         ]
-        for i in range(1, num_items + 1):
-            init_facts.append({"predicate": "item_on", "arguments": [f"item_{i}", "shelf"]})
+        # Connect rooms linearly
+        for i in range(len(room_names) - 1):
+            init_facts.append({"predicate": "connected_rooms", "arguments": [room_names[i], room_names[i+1]]})
+            init_facts.append({"predicate": "connected_rooms", "arguments": [room_names[i+1], room_names[i]]})
 
-        goal_facts = [{"predicate": "item_on", "arguments": ["item_1", "table"]}]
-        prompt = f"Move item_1 from kitchen shelf to living room table in {tier.value} household configuration."
+        # Distribute surfaces into rooms
+        for idx, s in enumerate(surface_names):
+            r = room_names[idx % len(room_names)]
+            init_facts.append({"predicate": "surface_in_room", "arguments": [s, r]})
+
+        for i in range(1, n_items + 1):
+            init_facts.append({"predicate": "item_on", "arguments": [f"item_{i}", surface_names[0]]})
+
+        dest_surface = surface_names[-1]
+        goal_facts = [{"predicate": "item_on", "arguments": ["item_1", dest_surface]}]
+        prompt = f"Move item_1 from {surface_names[0]} to {dest_surface} in {tier.value} household configuration."
+        est_states = n_rooms * ((n_surfaces + 1) ** n_items)
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="household_robotics",
@@ -242,42 +264,52 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=32 * num_items,
+            estimated_state_space=est_states,
         )
 
     def _gen_warehouse(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        sku_counts = {
-            ComplexityTier.TINY: 1,
-            ComplexityTier.SMALL: 2,
-            ComplexityTier.MEDIUM: 3,
-            ComplexityTier.LARGE: 4,
-            ComplexityTier.STRESS: 5,
+        tier_configs = {
+            ComplexityTier.TINY: (2, 2, 1),   # 2 zones, 2 bays, 1 sku (~8 states)
+            ComplexityTier.SMALL: (2, 3, 2),  # 2 zones, 3 bays, 2 skus (~36 states)
+            ComplexityTier.MEDIUM: (3, 4, 2), # 3 zones, 4 bays, 2 skus (~90 states)
+            ComplexityTier.LARGE: (3, 5, 3),  # 3 zones, 5 bays, 3 skus (~300 states)
+            ComplexityTier.STRESS: (4, 6, 4), # 4 zones, 6 bays, 4 skus (>1500 states)
         }
-        num_skus = sku_counts.get(tier, 1)
-        entities = {
-            "agv_1": "carrier",
-            "bay_storage": "bay",
-            "bay_dock": "bay",
-            "zone_storage": "zone",
-            "zone_dock": "zone",
-        }
-        for i in range(1, num_skus + 1):
-            entities[f"sku_{i}"] = "sku"
+        n_zones, n_bays, n_skus = tier_configs.get(tier, (2, 2, 1))
+        entities = {"agv_1": "carrier"}
+        zone_names = [f"zone_{i}" for i in range(1, n_zones + 1)]
+        bay_names = [f"bay_{i}" for i in range(1, n_bays + 1)]
+
+        for z in zone_names:
+            entities[z] = "zone"
+        for b in bay_names:
+            entities[b] = "bay"
+        for s in range(1, n_skus + 1):
+            entities[f"sku_{s}"] = "sku"
 
         init_facts = [
-            {"predicate": "carrier_at", "arguments": ["agv_1", "zone_storage"]},
-            {"predicate": "zone_connected", "arguments": ["zone_storage", "zone_dock"]},
-            {"predicate": "zone_connected", "arguments": ["zone_dock", "zone_storage"]},
-            {"predicate": "bay_in_zone", "arguments": ["bay_storage", "zone_storage"]},
-            {"predicate": "bay_in_zone", "arguments": ["bay_dock", "zone_dock"]},
+            {"predicate": "carrier_at", "arguments": ["agv_1", zone_names[0]]},
             {"predicate": "carrier_empty", "arguments": ["agv_1"]},
-            {"predicate": "bay_available", "arguments": ["bay_dock"]},
         ]
-        for i in range(1, num_skus + 1):
-            init_facts.append({"predicate": "sku_stored_in", "arguments": [f"sku_{i}", "bay_storage"]})
+        # Connect zones linearly
+        for i in range(len(zone_names) - 1):
+            init_facts.append({"predicate": "zone_connected", "arguments": [zone_names[i], zone_names[i+1]]})
+            init_facts.append({"predicate": "zone_connected", "arguments": [zone_names[i+1], zone_names[i]]})
 
-        goal_facts = [{"predicate": "sku_stored_in", "arguments": ["sku_1", "bay_dock"]}]
-        prompt = f"Move sku_1 from storage bay to dispatch dock in {tier.value} logistics configuration."
+        # Distribute bays into zones
+        for idx, b in enumerate(bay_names):
+            z = zone_names[idx % len(zone_names)]
+            init_facts.append({"predicate": "bay_in_zone", "arguments": [b, z]})
+            if idx > 0:
+                init_facts.append({"predicate": "bay_available", "arguments": [b]})
+
+        for s in range(1, n_skus + 1):
+            init_facts.append({"predicate": "sku_stored_in", "arguments": [f"sku_{s}", bay_names[0]]})
+
+        goal_bay = bay_names[-1]
+        goal_facts = [{"predicate": "sku_stored_in", "arguments": ["sku_1", goal_bay]}]
+        prompt = f"Move sku_1 from {bay_names[0]} to {goal_bay} in {tier.value} logistics configuration."
+        est_states = n_zones * ((n_bays + 1) ** n_skus)
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="warehouse",
@@ -286,37 +318,40 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=24 * num_skus,
+            estimated_state_space=est_states,
         )
 
     def _gen_scheduling(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        job_counts = {
-            ComplexityTier.TINY: 2,
-            ComplexityTier.SMALL: 3,
-            ComplexityTier.MEDIUM: 4,
-            ComplexityTier.LARGE: 5,
-            ComplexityTier.STRESS: 6,
+        tier_configs = {
+            ComplexityTier.TINY: (1, 2, 2),   # 1 machine, 2 slots, 2 jobs (~7 states)
+            ComplexityTier.SMALL: (1, 2, 3),  # 1 machine, 2 slots, 3 jobs (~13 states)
+            ComplexityTier.MEDIUM: (2, 2, 3), # 2 machines, 2 slots, 3 jobs (~73 states)
+            ComplexityTier.LARGE: (2, 2, 4),  # 2 machines, 2 slots, 4 jobs (~250 states)
+            ComplexityTier.STRESS: (3, 3, 5), # 3 machines, 3 slots, 5 jobs (>1000 states)
         }
-        num_jobs = job_counts.get(tier, 2)
-        entities = {
-            "machine_1": "resource",
-            "slot_1": "slot",
-            "slot_2": "slot",
-        }
-        for i in range(1, num_jobs + 1):
-            entities[f"task_{i}"] = "job"
+        n_machines, n_slots, n_jobs = tier_configs.get(tier, (1, 2, 2))
+        entities = {}
+        for m in range(1, n_machines + 1):
+            entities[f"machine_{m}"] = "resource"
+        for s in range(1, n_slots + 1):
+            entities[f"slot_{s}"] = "slot"
+        for j in range(1, n_jobs + 1):
+            entities[f"task_{j}"] = "job"
 
-        init_facts = [
-            {"predicate": "resource_available", "arguments": ["machine_1", "slot_1"]},
-            {"predicate": "resource_available", "arguments": ["machine_1", "slot_2"]},
-        ]
-        for i in range(1, num_jobs + 1):
-            init_facts.append({"predicate": "job_ready", "arguments": [f"task_{i}"]})
-        if num_jobs >= 2:
+        init_facts = []
+        for m in range(1, n_machines + 1):
+            for s in range(1, n_slots + 1):
+                init_facts.append({"predicate": "resource_available", "arguments": [f"machine_{m}", f"slot_{s}"]})
+
+        for j in range(1, n_jobs + 1):
+            init_facts.append({"predicate": "job_ready", "arguments": [f"task_{j}"]})
+
+        if n_jobs >= 2:
             init_facts.append({"predicate": "precedes", "arguments": ["task_1", "task_2"]})
 
-        goal_facts = [{"predicate": "job_completed", "arguments": [f"task_{num_jobs}"]}]
-        prompt = f"Schedule tasks on machine_1 satisfying DAG precedence in {tier.value} configuration."
+        goal_facts = [{"predicate": "job_completed", "arguments": [f"task_{n_jobs}"]}]
+        prompt = f"Schedule tasks on available resources satisfying DAG precedence in {tier.value} configuration."
+        est_states = (n_machines * n_slots + 1) ** (n_jobs - 1)
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="scheduling",
@@ -325,27 +360,37 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=16 * (num_jobs - 1),
+            estimated_state_space=est_states,
         )
 
     def _gen_software(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        entities = {
-            "commit_alpha": "commit",
-            "pkg_alpha": "artifact",
-            "staging": "environment",
+        tier_configs = {
+            ComplexityTier.TINY: (1, 1, 1),   # 1 commit, 1 artifact, 1 env (staging) (~9 states)
+            ComplexityTier.SMALL: (1, 1, 2),  # 1 commit, 1 artifact, 2 envs (staging, prod) (~16 states)
+            ComplexityTier.MEDIUM: (2, 2, 2), # 2 commits, 2 artifacts, 2 envs (~64 states)
+            ComplexityTier.LARGE: (2, 2, 3),  # 2 commits, 2 artifacts, 3 envs (~340 states)
+            ComplexityTier.STRESS: (3, 3, 3), # 3 commits, 3 artifacts, 3 envs (>1000 states)
         }
-        if tier in (ComplexityTier.MEDIUM, ComplexityTier.LARGE, ComplexityTier.STRESS):
-            entities["prod"] = "environment"
+        n_commits, n_artifacts, n_envs = tier_configs.get(tier, (1, 1, 1))
+        all_envs = ["dev", "staging", "prod"][:n_envs]
+        entities = {}
+        for c in range(1, n_commits + 1):
+            entities[f"commit_{c}"] = "commit"
+        for a in range(1, n_artifacts + 1):
+            entities[f"pkg_{a}"] = "artifact"
+        for e in all_envs:
+            entities[e] = "environment"
 
-        init_facts = [
-            {"predicate": "code_checked_out", "arguments": ["commit_alpha"]},
-            {"predicate": "environment_healthy", "arguments": ["staging"]},
-        ]
-        if "prod" in entities:
-            init_facts.append({"predicate": "environment_healthy", "arguments": ["prod"]})
+        init_facts = []
+        for c in range(1, n_commits + 1):
+            init_facts.append({"predicate": "code_checked_out", "arguments": [f"commit_{c}"]})
+        for e in all_envs:
+            init_facts.append({"predicate": "environment_healthy", "arguments": [e]})
 
-        goal_facts = [{"predicate": "deployed_to", "arguments": ["pkg_alpha", "staging"]}]
-        prompt = f"Build, test, scan, and deploy commit_alpha to staging environment ({tier.value} pipeline)."
+        dest_env = all_envs[-1]
+        goal_facts = [{"predicate": "deployed_to", "arguments": ["pkg_1", dest_env]}]
+        prompt = f"Build, test, scan, and deploy commit_1 to {dest_env} environment ({tier.value} pipeline)."
+        est_states = (2 ** n_commits) * (n_envs + 1) ** n_artifacts
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="software_workflow",
@@ -354,5 +399,5 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=32 if "prod" not in entities else 64,
+            estimated_state_space=est_states,
         )

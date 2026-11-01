@@ -5,6 +5,8 @@
   "macro_precision": 1.0,
   "macro_recall": 1.0,
   "macro_f1": 1.0,
+  "abstentions": 0,
+  "abstention_rate": 0.0,
   "per_class": {
     "PLANNING_ERROR": {
       "precision": 1.0,
