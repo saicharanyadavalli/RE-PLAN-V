@@ -129,6 +129,20 @@ class TestFastAPIRoutesE2E:
         assert "OURS_CounterexampleRepair" in data["summary"]
         assert "B3_GenericRegeneration" in data["summary"]
 
+    def test_dynamic_simulate_endpoint(self, client: TestClient):
+        resp = client.post(
+            "/api/dynamic/simulate",
+            json={"initial_prompt": "Stack the red box on the green box."},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "success"
+        assert data["world_change_detected"] is True
+        assert data["root_cause"] == "ENVIRONMENT_CHANGE"
+        assert len(data["new_plan_actions"]) > 0
+        assert data["final_verification"] == "VERIFIED"
+
+
 
 class TestCLIExecution:
     """Tests CLI entry points and benchmark invocation."""

@@ -83,18 +83,19 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print("-" * 80)
     print(f"Overall Attribution Macro Accuracy: {attr_results['accuracy'] * 100:.1f}% | Macro F1: {attr_results['macro_f1']:.2f}")
 
-    # 4. Multi-Domain Complexity Tiers (100–3000 States)
-    print(f"\n[4/4] Evaluating Multi-Domain Complexity Tier Coverage (6 Domains)...")
+    # 4. Multi-Domain Complexity Tiers (100–3000 States with Model B Measurement)
+    print(f"\n[4/4] Evaluating Multi-Domain Complexity Tier Coverage (6 Domains with Model B Measurement)...")
     from benchmark.generator.multi_domain_generator import MultiDomainBenchmarkGenerator, ComplexityTier
     tier_gen = MultiDomainBenchmarkGenerator(seed=seed)
-    tier_instances = tier_gen.generate_suite(instances_per_domain=1)
-    print("\n" + "-" * 80)
-    print(f"{'Domain ID':<24} | {'Complexity Tier':<16} | {'Est. States':<14} | {'Sample Goal'}")
-    print("-" * 80)
+    tier_instances = tier_gen.generate_suite(instances_per_domain=1, measure_all=True)
+    print("\n" + "-" * 88)
+    print(f"{'Domain ID':<22} | {'Tier':<8} | {'Measured States':<17} | {'Transitions':<12} | {'Sample Goal'}")
+    print("-" * 88)
     for ti in tier_instances:
         goal_str = ", ".join(f"{g['predicate']}({','.join(g['arguments'])})" for g in ti.goal_conditions)
-        print(f"{ti.domain_id:<24} | {ti.tier.value:<16} | {ti.estimated_state_space:<14} | {goal_str[:28]}")
-    print("-" * 80)
+        states_str = f"{ti.measured_unique_states} states" if ti.is_complete else f"{ti.measured_unique_states} (trunc)"
+        print(f"{ti.domain_id:<22} | {ti.tier.value:<8} | {states_str:<17} | {ti.measured_edges or 0:<12} | {goal_str[:25]}")
+    print("-" * 88)
 
     # Save summary report
     elapsed = time.perf_counter() - start_time
@@ -108,6 +109,7 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
                 "primary_results": primary_results,
                 "ablation_results": ablation_results,
                 "attribution_results": attr_results,
+                "multi_domain_tier_results": [ti.model_dump() for ti in tier_instances],
             },
             f,
             indent=2,

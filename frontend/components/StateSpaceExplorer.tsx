@@ -125,7 +125,8 @@ export function StateSpaceExplorer({
         max_depth_reached: Math.max(0, ...parsedNodes.map(n => n.depth)),
         goal_node_ids: parsedNodes.filter(n => n.is_goal).map(n => n.id),
         dead_end_node_ids: parsedNodes.filter(n => n.is_dead_end).map(n => n.id),
-        is_complete: true,
+        is_complete: false,
+        truncation_reason: "STATS_OMITTED_BY_BACKEND",
         enumeration_time_ms: 120,
       });
 

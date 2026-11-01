@@ -1,113 +1,113 @@
 {
-  "timestamp": 1790250862.1555998,
-  "elapsed_seconds": 0.04489749999993364,
+  "timestamp": 1793532184.3391242,
+  "elapsed_seconds": 2.239486999998917,
   "primary_results": {
     "experiment": "Primary Research Question: Counterexample-Guided Repair vs Generic Regeneration",
-    "num_instances": 2,
-    "seed": 123,
-    "recovery_advantage": 0.0,
+    "num_instances": 10,
+    "seed": 42,
+    "recovery_advantage": 0.5,
     "summary": {
       "B0_DirectNeural": {
         "experiment_id": "B0_DirectNeural",
-        "total_instances": 2,
+        "total_instances": 10,
         "valid_plan_rate": 0.0,
         "goal_success_rate": 0.0,
         "constraint_violation_rate": 1.0,
-        "repair_success_rate": 1.0,
+        "repair_success_rate": 0.0,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 0.3854000005958369,
-        "avg_verification_time_ms": 0.0657499995213584,
-        "avg_repair_time_ms": 0.3854000005958369,
+        "avg_planning_time_ms": 0.2988400001413538,
+        "avg_verification_time_ms": 0.04566999996313825,
+        "avg_repair_time_ms": 0.0,
         "avg_nodes_expanded": 0.0,
         "avg_plan_cost": 0.0,
-        "fault_attribution_accuracy": 1.0,
+        "fault_attribution_accuracy": 0.0,
         "recovery_advantage_over_regeneration": 0.0
       },
       "B1_FormalizedPlanner": {
         "experiment_id": "B1_FormalizedPlanner",
-        "total_instances": 2,
+        "total_instances": 10,
         "valid_plan_rate": 1.0,
         "goal_success_rate": 1.0,
         "constraint_violation_rate": 0.0,
         "repair_success_rate": 1.0,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 2.083100001073035,
-        "avg_verification_time_ms": 0.14725000073667616,
-        "avg_repair_time_ms": 2.083100001073035,
-        "avg_nodes_expanded": 3.0,
-        "avg_plan_cost": 2.0,
-        "fault_attribution_accuracy": 1.0,
+        "avg_planning_time_ms": 39.75730999954976,
+        "avg_verification_time_ms": 0.33530999990034616,
+        "avg_repair_time_ms": 0.0,
+        "avg_nodes_expanded": 23.2,
+        "avg_plan_cost": 4.6,
+        "fault_attribution_accuracy": 0.0,
         "recovery_advantage_over_regeneration": 0.0
       },
       "B2_VerifierNoRepair": {
         "experiment_id": "B2_VerifierNoRepair",
-        "total_instances": 2,
+        "total_instances": 10,
         "valid_plan_rate": 0.0,
         "goal_success_rate": 0.0,
         "constraint_violation_rate": 1.0,
-        "repair_success_rate": 1.0,
+        "repair_success_rate": 0.0,
         "avg_repair_iterations": 0.0,
-        "avg_planning_time_ms": 0.2051999990726472,
-        "avg_verification_time_ms": 0.03509999987727497,
-        "avg_repair_time_ms": 0.2051999990726472,
+        "avg_planning_time_ms": 0.24686000015208265,
+        "avg_verification_time_ms": 0.037990000237186905,
+        "avg_repair_time_ms": 0.0,
         "avg_nodes_expanded": 0.0,
         "avg_plan_cost": 0.0,
-        "fault_attribution_accuracy": 1.0,
+        "fault_attribution_accuracy": 0.0,
         "recovery_advantage_over_regeneration": 0.0
       },
       "B3_GenericRegeneration": {
         "experiment_id": "B3_GenericRegeneration",
-        "total_instances": 2,
-        "valid_plan_rate": 1.0,
-        "goal_success_rate": 1.0,
-        "constraint_violation_rate": 0.0,
-        "repair_success_rate": 1.0,
-        "avg_repair_iterations": 1.0,
-        "avg_planning_time_ms": 2.0930499995301943,
-        "avg_verification_time_ms": 0.14099999953032238,
-        "avg_repair_time_ms": 2.0930499995301943,
-        "avg_nodes_expanded": 3.0,
-        "avg_plan_cost": 2.0,
-        "fault_attribution_accuracy": 1.0,
+        "total_instances": 10,
+        "valid_plan_rate": 0.5,
+        "goal_success_rate": 0.5,
+        "constraint_violation_rate": 0.5,
+        "repair_success_rate": 0.5,
+        "avg_repair_iterations": 2.2,
+        "avg_planning_time_ms": 27.48850999996648,
+        "avg_verification_time_ms": 0.23496000012528384,
+        "avg_repair_time_ms": 27.48850999996648,
+        "avg_nodes_expanded": 0.0,
+        "avg_plan_cost": 3.2,
+        "fault_attribution_accuracy": 0.0,
         "recovery_advantage_over_regeneration": 0.0
       },
       "OURS_CounterexampleRepair": {
         "experiment_id": "OURS_CounterexampleRepair",
-        "total_instances": 2,
+        "total_instances": 10,
         "valid_plan_rate": 1.0,
         "goal_success_rate": 1.0,
         "constraint_violation_rate": 0.0,
         "repair_success_rate": 1.0,
         "avg_repair_iterations": 1.0,
-        "avg_planning_time_ms": 3.594399999201414,
-        "avg_verification_time_ms": 0.1745000008668285,
-        "avg_repair_time_ms": 3.594399999201414,
-        "avg_nodes_expanded": 3.0,
-        "avg_plan_cost": 2.0,
+        "avg_planning_time_ms": 41.108080000049085,
+        "avg_verification_time_ms": 0.2878600003896281,
+        "avg_repair_time_ms": 41.108080000049085,
+        "avg_nodes_expanded": 23.2,
+        "avg_plan_cost": 4.6,
         "fault_attribution_accuracy": 1.0,
-        "recovery_advantage_over_regeneration": 0.0
+        "recovery_advantage_over_regeneration": 0.5
       }
     }
   },
   "ablation_results": {
     "experiment": "Component Ablation Study",
-    "num_instances": 2,
-    "seed": 123,
+    "num_instances": 10,
+    "seed": 42,
     "ablation_runs": {
       "full": {
         "summary": {
           "experiment_id": "Ablation_full",
-          "total_instances": 2,
+          "total_instances": 10,
           "valid_plan_rate": 1.0,
           "goal_success_rate": 1.0,
           "constraint_violation_rate": 0.0,
           "repair_success_rate": 1.0,
           "avg_repair_iterations": 1.0,
-          "avg_planning_time_ms": 2.446849999614642,
-          "avg_verification_time_ms": 0.14249999912863132,
-          "avg_repair_time_ms": 2.446849999614642,
-          "avg_nodes_expanded": 3.0,
-          "avg_plan_cost": 2.0,
+          "avg_planning_time_ms": 32.99946000024647,
+          "avg_verification_time_ms": 0.20612000007531606,
+          "avg_repair_time_ms": 32.99946000024647,
+          "avg_nodes_expanded": 23.2,
+          "avg_plan_cost": 4.6,
           "fault_attribution_accuracy": 1.0,
           "recovery_advantage_over_regeneration": 0.0
         }
@@ -115,7 +115,7 @@
       "without_verifier": {
         "summary": {
           "experiment_id": "Ablation_without_verifier",
-          "total_instances": 2,
+          "total_instances": 10,
           "valid_plan_rate": 1.0,
           "goal_success_rate": 1.0,
           "constraint_violation_rate": 0.0,
@@ -126,82 +126,549 @@
           "avg_repair_time_ms": 0.0,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
-          "fault_attribution_accuracy": 1.0,
+          "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": 0.0
         }
       },
       "without_counterexample": {
         "summary": {
           "experiment_id": "Ablation_without_counterexample",
-          "total_instances": 2,
+          "total_instances": 10,
           "valid_plan_rate": 0.0,
           "goal_success_rate": 0.0,
           "constraint_violation_rate": 1.0,
           "repair_success_rate": 0.0,
           "avg_repair_iterations": 5.0,
-          "avg_planning_time_ms": 0.24904999918362591,
+          "avg_planning_time_ms": 0.1519199993708753,
           "avg_verification_time_ms": 0.0,
-          "avg_repair_time_ms": 0.24904999918362591,
+          "avg_repair_time_ms": 0.1519199993708753,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
-          "fault_attribution_accuracy": 1.0,
+          "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": 0.0
         }
       },
       "without_attribution": {
         "summary": {
           "experiment_id": "Ablation_without_attribution",
-          "total_instances": 2,
+          "total_instances": 10,
           "valid_plan_rate": 1.0,
           "goal_success_rate": 1.0,
           "constraint_violation_rate": 0.0,
           "repair_success_rate": 1.0,
           "avg_repair_iterations": 1.0,
-          "avg_planning_time_ms": 2.3330000003625173,
-          "avg_verification_time_ms": 0.1306000003751251,
-          "avg_repair_time_ms": 2.3330000003625173,
-          "avg_nodes_expanded": 3.0,
-          "avg_plan_cost": 2.0,
-          "fault_attribution_accuracy": 1.0,
+          "avg_planning_time_ms": 33.37189000030776,
+          "avg_verification_time_ms": 0.27138999994349433,
+          "avg_repair_time_ms": 33.37189000030776,
+          "avg_nodes_expanded": 23.2,
+          "avg_plan_cost": 4.6,
+          "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": 0.0
         }
       },
       "without_repair": {
         "summary": {
           "experiment_id": "Ablation_without_repair",
-          "total_instances": 2,
+          "total_instances": 10,
           "valid_plan_rate": 0.0,
           "goal_success_rate": 0.0,
           "constraint_violation_rate": 1.0,
-          "repair_success_rate": 1.0,
+          "repair_success_rate": 0.0,
           "avg_repair_iterations": 0.0,
           "avg_planning_time_ms": 0.0,
-          "avg_verification_time_ms": 0.03614999968704069,
+          "avg_verification_time_ms": 0.03163999972457532,
           "avg_repair_time_ms": 0.0,
           "avg_nodes_expanded": 0.0,
           "avg_plan_cost": 0.0,
-          "fault_attribution_accuracy": 1.0,
+          "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": 0.0
         }
       },
       "generic_regeneration": {
         "summary": {
           "experiment_id": "Ablation_generic_regeneration",
-          "total_instances": 2,
-          "valid_plan_rate": 1.0,
-          "goal_success_rate": 1.0,
-          "constraint_violation_rate": 0.0,
-          "repair_success_rate": 1.0,
-          "avg_repair_iterations": 1.0,
-          "avg_planning_time_ms": 2.710700000534416,
-          "avg_verification_time_ms": 0.15024999993329402,
-          "avg_repair_time_ms": 2.710700000534416,
-          "avg_nodes_expanded": 3.0,
-          "avg_plan_cost": 2.0,
-          "fault_attribution_accuracy": 1.0,
+          "total_instances": 10,
+          "valid_plan_rate": 0.5,
+          "goal_success_rate": 0.5,
+          "constraint_violation_rate": 0.5,
+          "repair_success_rate": 0.5,
+          "avg_repair_iterations": 3.2,
+          "avg_planning_time_ms": 34.131320000233245,
+          "avg_verification_time_ms": 0.1936699994985247,
+          "avg_repair_time_ms": 34.131320000233245,
+          "avg_nodes_expanded": 0.0,
+          "avg_plan_cost": 3.2,
+          "fault_attribution_accuracy": 0.0,
           "recovery_advantage_over_regeneration": 0.0
         }
       }
     }
-  }
+  },
+  "attribution_results": {
+    "experiment": "5-Class Fault Attribution Matrix & Precision-Recall Analysis",
+    "total_evaluated": 50,
+    "accuracy": 1.0,
+    "macro_precision": 1.0,
+    "macro_recall": 1.0,
+    "macro_f1": 1.0,
+    "per_class": {
+      "PLANNING_ERROR": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 10
+      },
+      "PERCEPTION_ERROR": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 10
+      },
+      "FORMALIZATION_ERROR": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 10
+      },
+      "ENVIRONMENT_CHANGE": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 10
+      },
+      "UNKNOWN_AMBIGUOUS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 10
+      }
+    },
+    "confusion_matrix": {
+      "PLANNING_ERROR": {
+        "PLANNING_ERROR": 10,
+        "PERCEPTION_ERROR": 0,
+        "FORMALIZATION_ERROR": 0,
+        "ENVIRONMENT_CHANGE": 0,
+        "UNKNOWN_AMBIGUOUS": 0
+      },
+      "PERCEPTION_ERROR": {
+        "PLANNING_ERROR": 0,
+        "PERCEPTION_ERROR": 10,
+        "FORMALIZATION_ERROR": 0,
+        "ENVIRONMENT_CHANGE": 0,
+        "UNKNOWN_AMBIGUOUS": 0
+      },
+      "FORMALIZATION_ERROR": {
+        "PLANNING_ERROR": 0,
+        "PERCEPTION_ERROR": 0,
+        "FORMALIZATION_ERROR": 10,
+        "ENVIRONMENT_CHANGE": 0,
+        "UNKNOWN_AMBIGUOUS": 0
+      },
+      "ENVIRONMENT_CHANGE": {
+        "PLANNING_ERROR": 0,
+        "PERCEPTION_ERROR": 0,
+        "FORMALIZATION_ERROR": 0,
+        "ENVIRONMENT_CHANGE": 10,
+        "UNKNOWN_AMBIGUOUS": 0
+      },
+      "UNKNOWN_AMBIGUOUS": {
+        "PLANNING_ERROR": 0,
+        "PERCEPTION_ERROR": 0,
+        "FORMALIZATION_ERROR": 0,
+        "ENVIRONMENT_CHANGE": 0,
+        "UNKNOWN_AMBIGUOUS": 10
+      }
+    }
+  },
+  "multi_domain_tier_results": [
+    {
+      "instance_id": "blocks_world_tiny_2824",
+      "domain_id": "blocks_world",
+      "tier": "TINY",
+      "prompt": "Stack blocks ['b1', 'b2'] to satisfy assembly goals.",
+      "entities": {
+        "b1": "block",
+        "b2": "block"
+      },
+      "initial_facts": [
+        {
+          "predicate": "on_table",
+          "arguments": [
+            "b1"
+          ]
+        },
+        {
+          "predicate": "clear",
+          "arguments": [
+            "b1"
+          ]
+        },
+        {
+          "predicate": "on_table",
+          "arguments": [
+            "b2"
+          ]
+        },
+        {
+          "predicate": "clear",
+          "arguments": [
+            "b2"
+          ]
+        },
+        {
+          "predicate": "handempty",
+          "arguments": []
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "on",
+          "arguments": [
+            "b1",
+            "b2"
+          ]
+        }
+      ],
+      "estimated_state_space": 3,
+      "measured_unique_states": 5,
+      "measured_edges": 8,
+      "is_complete": true
+    },
+    {
+      "instance_id": "grid_world_tiny_1409",
+      "domain_id": "grid_world",
+      "tier": "TINY",
+      "prompt": "Navigate agent from c1 to destination cell c4 across a 4-cell grid.",
+      "entities": {
+        "agent": "agent",
+        "c1": "location",
+        "c2": "location",
+        "c3": "location",
+        "c4": "location"
+      },
+      "initial_facts": [
+        {
+          "predicate": "at",
+          "arguments": [
+            "agent",
+            "c1"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c1",
+            "c2"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c2",
+            "c1"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c2",
+            "c3"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c3",
+            "c2"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c3",
+            "c4"
+          ]
+        },
+        {
+          "predicate": "connected",
+          "arguments": [
+            "c4",
+            "c3"
+          ]
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "at",
+          "arguments": [
+            "agent",
+            "c4"
+          ]
+        }
+      ],
+      "estimated_state_space": 4,
+      "measured_unique_states": 4,
+      "measured_edges": 6,
+      "is_complete": true
+    },
+    {
+      "instance_id": "household_robotics_tiny_5506",
+      "domain_id": "household_robotics",
+      "tier": "TINY",
+      "prompt": "Move item_1 from kitchen shelf to living room table in TINY household configuration.",
+      "entities": {
+        "robot": "robot",
+        "kitchen": "room",
+        "living_room": "room",
+        "shelf": "surface",
+        "table": "surface",
+        "item_1": "item"
+      },
+      "initial_facts": [
+        {
+          "predicate": "robot_at",
+          "arguments": [
+            "robot",
+            "kitchen"
+          ]
+        },
+        {
+          "predicate": "connected_rooms",
+          "arguments": [
+            "kitchen",
+            "living_room"
+          ]
+        },
+        {
+          "predicate": "connected_rooms",
+          "arguments": [
+            "living_room",
+            "kitchen"
+          ]
+        },
+        {
+          "predicate": "surface_in_room",
+          "arguments": [
+            "shelf",
+            "kitchen"
+          ]
+        },
+        {
+          "predicate": "surface_in_room",
+          "arguments": [
+            "table",
+            "living_room"
+          ]
+        },
+        {
+          "predicate": "gripper_empty",
+          "arguments": [
+            "robot"
+          ]
+        },
+        {
+          "predicate": "item_on",
+          "arguments": [
+            "item_1",
+            "shelf"
+          ]
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "item_on",
+          "arguments": [
+            "item_1",
+            "table"
+          ]
+        }
+      ],
+      "estimated_state_space": 32,
+      "measured_unique_states": 6,
+      "measured_edges": 10,
+      "is_complete": true
+    },
+    {
+      "instance_id": "warehouse_tiny_5012",
+      "domain_id": "warehouse",
+      "tier": "TINY",
+      "prompt": "Move sku_1 from storage bay to dispatch dock in TINY logistics configuration.",
+      "entities": {
+        "agv_1": "carrier",
+        "bay_storage": "bay",
+        "bay_dock": "bay",
+        "zone_storage": "zone",
+        "zone_dock": "zone",
+        "sku_1": "sku"
+      },
+      "initial_facts": [
+        {
+          "predicate": "carrier_at",
+          "arguments": [
+            "agv_1",
+            "zone_storage"
+          ]
+        },
+        {
+          "predicate": "zone_connected",
+          "arguments": [
+            "zone_storage",
+            "zone_dock"
+          ]
+        },
+        {
+          "predicate": "zone_connected",
+          "arguments": [
+            "zone_dock",
+            "zone_storage"
+          ]
+        },
+        {
+          "predicate": "bay_in_zone",
+          "arguments": [
+            "bay_storage",
+            "zone_storage"
+          ]
+        },
+        {
+          "predicate": "bay_in_zone",
+          "arguments": [
+            "bay_dock",
+            "zone_dock"
+          ]
+        },
+        {
+          "predicate": "carrier_empty",
+          "arguments": [
+            "agv_1"
+          ]
+        },
+        {
+          "predicate": "bay_available",
+          "arguments": [
+            "bay_dock"
+          ]
+        },
+        {
+          "predicate": "sku_stored_in",
+          "arguments": [
+            "sku_1",
+            "bay_storage"
+          ]
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "sku_stored_in",
+          "arguments": [
+            "sku_1",
+            "bay_dock"
+          ]
+        }
+      ],
+      "estimated_state_space": 24,
+      "measured_unique_states": 8,
+      "measured_edges": 13,
+      "is_complete": true
+    },
+    {
+      "instance_id": "scheduling_tiny_4657",
+      "domain_id": "scheduling",
+      "tier": "TINY",
+      "prompt": "Schedule tasks on machine_1 satisfying DAG precedence in TINY configuration.",
+      "entities": {
+        "machine_1": "resource",
+        "slot_1": "slot",
+        "slot_2": "slot",
+        "task_1": "job",
+        "task_2": "job"
+      },
+      "initial_facts": [
+        {
+          "predicate": "resource_available",
+          "arguments": [
+            "machine_1",
+            "slot_1"
+          ]
+        },
+        {
+          "predicate": "resource_available",
+          "arguments": [
+            "machine_1",
+            "slot_2"
+          ]
+        },
+        {
+          "predicate": "job_ready",
+          "arguments": [
+            "task_1"
+          ]
+        },
+        {
+          "predicate": "job_ready",
+          "arguments": [
+            "task_2"
+          ]
+        },
+        {
+          "predicate": "precedes",
+          "arguments": [
+            "task_1",
+            "task_2"
+          ]
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "job_completed",
+          "arguments": [
+            "task_2"
+          ]
+        }
+      ],
+      "estimated_state_space": 16,
+      "measured_unique_states": 7,
+      "measured_edges": 10,
+      "is_complete": true
+    },
+    {
+      "instance_id": "software_workflow_tiny_3286",
+      "domain_id": "software_workflow",
+      "tier": "TINY",
+      "prompt": "Build, test, scan, and deploy commit_alpha to staging environment (TINY pipeline).",
+      "entities": {
+        "commit_alpha": "commit",
+        "pkg_alpha": "artifact",
+        "staging": "environment"
+      },
+      "initial_facts": [
+        {
+          "predicate": "code_checked_out",
+          "arguments": [
+            "commit_alpha"
+          ]
+        },
+        {
+          "predicate": "environment_healthy",
+          "arguments": [
+            "staging"
+          ]
+        }
+      ],
+      "goal_conditions": [
+        {
+          "predicate": "deployed_to",
+          "arguments": [
+            "pkg_alpha",
+            "staging"
+          ]
+        }
+      ],
+      "estimated_state_space": 32,
+      "measured_unique_states": 9,
+      "measured_edges": 32,
+      "is_complete": true
+    }
+  ]
 }

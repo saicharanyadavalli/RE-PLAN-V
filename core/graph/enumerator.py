@@ -88,11 +88,20 @@ class CompleteReachableGraphEnumerator:
                 truncation_reason = "MAX_EDGES_EXCEEDED"
                 break
 
-            applicable = domain.applicable_actions(curr_state, problem.registry)
+            applicable = sorted(
+                domain.applicable_actions(curr_state, problem.registry),
+                key=lambda a: a.to_string(),
+            )
             if not applicable and not nodes[curr_id].is_goal:
                 nodes[curr_id].is_dead_end = True
 
             for action in applicable:
+                # Check edge limit before generating transitions
+                if len(edges) >= self.max_edges:
+                    is_complete = False
+                    truncation_reason = "MAX_EDGES_EXCEEDED"
+                    break
+
                 # Check problem-level hard constraints
                 ok_hc, _ = problem.check_hard_constraints(
                     curr_state, action.name, list(action.arguments)
@@ -155,10 +164,9 @@ class CompleteReachableGraphEnumerator:
 
         # If truncated, mark any remaining unexpanded frontier nodes as boundary
         if not is_complete:
-            for s, _ in worklist:
-                s_id = domain.canonical_state_key(s)
-                if s_id in nodes:
-                    nodes[s_id].is_boundary = True
+            for n_id, n in nodes.items():
+                if not n.expanded:
+                    n.is_boundary = True
 
         total_time_ms = (time.perf_counter() - start_time) * 1000.0
         goal_ids = [n.node_id for n in nodes.values() if n.is_goal]

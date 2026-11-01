@@ -17,7 +17,7 @@
 > 5. **Evidence-based 5-class Fault Attribution Engine** that traces root cause across perception, formalization, planning, or environment.
 > 6. **Counterexample-guided symbolic repair loop** that injects formal negative pruning constraints into the search space.
 >
-> **Our empirical experiments demonstrate that while generic regeneration recovers only 0% of deterministic search failures, RE-PLAN-V's counterexample-guided pruning achieves 100% recovery with sub-5 millisecond repair latency."**
+> **Our empirical experiments demonstrate that while generic regeneration recovers only 50% on benchmark candidate failures, RE-PLAN-V's counterexample-guided pruning achieves 100% recovery with low millisecond repair latency, demonstrating an empirical +50.0% recovery advantage."**
 
 ---
 
@@ -108,11 +108,11 @@ If the professor asks: *"Did an LLM just do all of this for you? What did your t
 ---
 
 ### Pillar 6: Counterexample-Guided Symbolic Repair Loop
-- **Module:** `core/repair/` ([engine.py](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/repair/engine.py))
+- **Module:** `core/repair/` ([generator.py](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/repair/generator.py)), `core/replanning/` ([loop.py](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/replanning/loop.py))
 - **The Core Flaw in Generic Re-planning (Baseline B3):**
-  - Standard robotic frameworks simply re-invoke the planner or prompt the LLM: *"That failed, try again."*
-  - Because deterministic planners produce the same output on the same input, and stochastic LLMs repeat their failure modes, **Baseline B3 achieves 0% recovery**.
-- **RE-PLAN-V CEGIS (Counterexample-Guided Inductive Synthesis):**
+  - Standard robotic frameworks re-invoke the planner or re-sample alternative action sequences without counterexample feedback.
+  - Because unguided re-sampling lacks structural knowledge of the failure point, **Baseline B3 achieves only 50.0% recovery** and wastes search attempts re-entering invalid states.
+- **RE-PLAN-V Counterexample-Guided Constraint Repair:**
   - We synthesize a formal negative constraint from the witness $W$:
     $$\mathcal{C}_{\text{repair}} = \text{FORBID\_ACTION\_IN\_STATE}(a_k, S_k)$$
   - During the subsequent $A^*$ expansion, when generating successors from node $n$:
@@ -166,8 +166,8 @@ If demoing with a teammate's GPU laptop:
 #### Q2: What is Robinson's Unification and why is it needed?
 > **Answer:** Robinson's unification algorithm finds the Most General Unifier (MGU) $\theta$ for two First-Order Logic atomic formulas $P(t_1, \dots, t_n)$ and $Q(u_1, \dots, u_n)$. In RE-PLAN-V, actions have parameterized preconditions (e.g., `on(?x, ?y)`). Grounding and verifier pattern-matching require finding substitutions for variables `?x` and `?y` against current world state facts (e.g., `on(red_box, blue_box)`). Robinson's algorithm guarantees that if a valid substitution exists, it finds the unique most general one, including an occurs-check to avoid cyclic variable binding.
 
-#### Q3: Why does Baseline B3 (Generic Regeneration) achieve 0% recovery in your benchmark?
-> **Answer:** In deterministic planning, if an algorithm generates an invalid plan because an invariant was not explicitly enforced in its initial search configuration, simply re-running the same planner without adding new constraints will execute the exact same deterministic branch and produce the exact same invalid plan. RE-PLAN-V achieves 100% recovery because our minimal counterexample witness dynamically synthesizes a negative constraint $\text{FORBID\_ACTION\_IN\_STATE}(a_k, S_k)$ that is injected directly into the open list evaluation, pruning that failing branch and forcing the planner down a sound alternative trajectory.
+#### Q3: How does RE-PLAN-V achieve a +50.0% recovery advantage over Baseline B3 (Generic Regeneration)?
+> **Answer:** In active generic regeneration (B3), the system re-samples alternative candidate plan sequences without structured failure information, leaving it vulnerable to repeatedly sampling branches that hit the same underlying precondition or invariant violation (achieving 50.0% recovery). RE-PLAN-V achieves 100% recovery (+50.0% advantage) because our minimal counterexample witness dynamically synthesizes a formal negative constraint $\text{FORBID\_ACTION\_IN\_STATE}(a_k, S_k)$ that is injected directly into the search open-list, strictly pruning the failing branch and directing the planner toward provably sound trajectories.
 
 #### Q4: How is your system protected against infinite replanning loops?
 > **Answer:** We enforce three protective bounds:
@@ -202,7 +202,7 @@ If demoing with a teammate's GPU laptop:
 4. **Demo Step 3: Comparative Research Benchmark**
    - Click **Research Benchmark** tab.
    - Click **Run Live Experiment**.
-   - Show the live measured table confirming the Central Hypothesis: B0 (0%), B2 (0%), B3 (0%), OURS (100% recovery).
+   - Show the live measured table confirming the Central Hypothesis: B0 (0%), B1 (100% scratch), B2 (0%), B3 (50%), OURS (100% recovery, +50.0% recovery advantage).
 5. **Demo Step 4: 10 Inviolable Rules & Viva Defense Guide**
    - Click **10 Inviolable Rules** tab to show architectural rigor.
    - Click **Viva Defense Guide** modal to show complete theoretical mastery.

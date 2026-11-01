@@ -193,3 +193,49 @@ class TestSystemProperties:
         assert v_res.is_valid is False
         assert v_res.failed_step_index == 0
         assert v_res.explanation != ""
+
+    def test_property_state_hash_invariance_to_step_index(self):
+        """Property: Closed-world state equality and hash are invariant to step_index."""
+        f1 = Fact("on_table", ["b1"])
+        f2 = Fact("clear", ["b1"])
+        s_step0 = SymbolicState([f1, f2], objects={"b1": "block"}, step_index=0)
+        s_step5 = SymbolicState([f1, f2], objects={"b1": "block"}, step_index=5)
+
+        assert s_step0 == s_step5
+        assert hash(s_step0) == hash(s_step5)
+        # Verify set containment respects closed-world equivalence
+        state_set = {s_step0}
+        assert s_step5 in state_set
+
+    def test_property_transition_function_strict_determinism(self):
+        """Property: STRIPS transition function is deterministic and idempotent."""
+        domain = create_blocks_world_domain()
+        s0 = SymbolicState(
+            [Fact("on_table", ["b1"]), Fact("clear", ["b1"]), Fact("handempty", [])],
+            objects={"b1": "block"},
+        )
+        pickup_op = domain.get_action("pick_up")
+        ground_pickup = pickup_op.instantiate({"?b": "b1"})
+
+        res1_state, err1 = apply_transition(s0, ground_pickup)
+        res2_state, err2 = apply_transition(s0, ground_pickup)
+
+        assert err1 is None and err2 is None
+        assert res1_state == res2_state
+        assert hash(res1_state) == hash(res2_state)
+
+    def test_property_rpg_heuristic_goal_state_is_zero(self):
+        """Property: RPG heuristic is strictly 0 at any state that satisfies the goal."""
+        from core.search.heuristics import RelaxedPlanningGraphHeuristic
+        domain = create_blocks_world_domain()
+        goal = [Fact("on", ["b1", "b2"])]
+        reg = ObjectRegistry(domain.type_hierarchy)
+        reg.register_object("b1", "block")
+        reg.register_object("b2", "block")
+
+        goal_state = SymbolicState(
+            [Fact("on", ["b1", "b2"]), Fact("clear", ["b1"]), Fact("on_table", ["b2"])],
+            objects=reg.get_all_objects(),
+        )
+        h = RelaxedPlanningGraphHeuristic(ground_actions=(), mode="h_max")
+        assert h.compute(goal_state, goal) == 0.0

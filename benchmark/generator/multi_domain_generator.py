@@ -1,7 +1,8 @@
 """Multi-Domain Benchmark Generator supporting Complexity Tiers (100–3000 states).
 
 Generates deterministic problem instances across all 6 planning domains with
-fixed random seeds for reproducible research evaluation.
+fixed random seeds for reproducible research evaluation, calibrated with
+authoritative Model B state-space enumeration measurements.
 """
 
 from __future__ import annotations
@@ -32,6 +33,9 @@ class MultiDomainBenchmarkInstance(BaseModel):
     initial_facts: List[Dict[str, Any]] = Field(default_factory=list)
     goal_conditions: List[Dict[str, Any]] = Field(default_factory=list)
     estimated_state_space: int = 0
+    measured_unique_states: Optional[int] = None
+    measured_edges: Optional[int] = None
+    is_complete: Optional[bool] = None
 
 
 class MultiDomainBenchmarkGenerator:
@@ -42,27 +46,77 @@ class MultiDomainBenchmarkGenerator:
         self.rng = random.Random(seed)
 
     def generate_by_tier(
-        self, tier: ComplexityTier, domain_id: str = "blocks_world"
+        self,
+        tier: ComplexityTier,
+        domain_id: str = "blocks_world",
+        measure_now: bool = False,
     ) -> MultiDomainBenchmarkInstance:
         """Generates a problem instance matching the requested tier and domain."""
         inst_id = f"{domain_id}_{tier.value.lower()}_{self.rng.randint(1000, 9999)}"
 
-        if domain_id == "blocks_world":
-            return self._gen_blocks_world(inst_id, tier)
-        elif domain_id == "grid_world":
-            return self._gen_grid_world(inst_id, tier)
-        elif domain_id == "household_robotics":
-            return self._gen_household(inst_id, tier)
+        if domain_id in ("blocks_world", "blocks"):
+            inst = self._gen_blocks_world(inst_id, tier)
+        elif domain_id in ("grid_world", "grid"):
+            inst = self._gen_grid_world(inst_id, tier)
+        elif domain_id in ("household", "household_robotics"):
+            inst = self._gen_household(inst_id, tier)
         elif domain_id == "warehouse":
-            return self._gen_warehouse(inst_id, tier)
+            inst = self._gen_warehouse(inst_id, tier)
         elif domain_id == "scheduling":
-            return self._gen_scheduling(inst_id, tier)
+            inst = self._gen_scheduling(inst_id, tier)
         elif domain_id == "software_workflow":
-            return self._gen_software(inst_id, tier)
+            inst = self._gen_software(inst_id, tier)
         else:
-            return self._gen_blocks_world(inst_id, tier)
+            inst = self._gen_blocks_world(inst_id, tier)
 
-    def generate_suite(self, instances_per_domain: int = 2) -> List[MultiDomainBenchmarkInstance]:
+        if measure_now:
+            inst = self.measure_state_space(inst)
+        return inst
+
+    def measure_state_space(
+        self, instance: MultiDomainBenchmarkInstance, max_nodes: int = 3500
+    ) -> MultiDomainBenchmarkInstance:
+        """Runs the authoritative Model B enumerator to measure exact reachable graph size."""
+        from core.domains import registry as dom_reg
+        from core.graph.enumerator import CompleteReachableGraphEnumerator
+        from core.world.problem import SymbolicProblem
+        from core.world.state import SymbolicState
+        from core.world.types import ObjectRegistry
+
+        domain = dom_reg.get(instance.domain_id)
+        if not domain:
+            return instance
+
+        reg = ObjectRegistry(domain.type_hierarchy)
+        for obj, otype in instance.entities.items():
+            reg.register_object(obj, otype)
+
+        s0 = SymbolicState([
+            Fact(f["predicate"], list(f["arguments"])) for f in instance.initial_facts
+        ])
+        goals = [
+            Fact(f["predicate"], list(f["arguments"])) for f in instance.goal_conditions
+        ]
+        problem = SymbolicProblem(
+            name=instance.instance_id,
+            domain_name=domain.domain_id,
+            registry=reg,
+            initial_state=s0,
+            goal_conditions=goals,
+        )
+
+        enumerator = CompleteReachableGraphEnumerator(
+            max_nodes=max_nodes, max_edges=max_nodes * 4, timeout_seconds=5.0
+        )
+        graph = enumerator.enumerate_graph(problem, domain)
+        instance.measured_unique_states = graph.stats.total_nodes
+        instance.measured_edges = graph.stats.total_edges
+        instance.is_complete = graph.stats.is_complete
+        return instance
+
+    def generate_suite(
+        self, instances_per_domain: int = 2, measure_all: bool = False
+    ) -> List[MultiDomainBenchmarkInstance]:
         """Generates a complete test suite across all 6 domains."""
         suite = []
         domain_ids = [d.domain_id for d in registry.list_domains()]
@@ -71,11 +125,11 @@ class MultiDomainBenchmarkGenerator:
         for d_id in domain_ids:
             for i in range(instances_per_domain):
                 tier = tiers[i % len(tiers)]
-                suite.append(self.generate_by_tier(tier=tier, domain_id=d_id))
+                inst = self.generate_by_tier(tier=tier, domain_id=d_id, measure_now=measure_all)
+                suite.append(inst)
         return suite
 
     def _gen_blocks_world(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
-        # Scale block count by tier
         block_counts = {
             ComplexityTier.TINY: 2,
             ComplexityTier.SMALL: 3,
@@ -102,9 +156,9 @@ class MultiDomainBenchmarkGenerator:
             4: 73,
             5: 501,
             6: 4051,
-        }.get(n, 100)
+        }.get(n, 13)
 
-        prompt = f"Stack block b1 on b2 in a {n}-block tabletop world."
+        prompt = f"Stack blocks {list(entities.keys())} to satisfy assembly goals."
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="blocks_world",
@@ -144,93 +198,134 @@ class MultiDomainBenchmarkGenerator:
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=n * 2,
+            estimated_state_space=n,
         )
 
     def _gen_household(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
+        # Scale rooms and items by tier
+        item_counts = {
+            ComplexityTier.TINY: 1,
+            ComplexityTier.SMALL: 2,
+            ComplexityTier.MEDIUM: 3,
+            ComplexityTier.LARGE: 4,
+            ComplexityTier.STRESS: 5,
+        }
+        num_items = item_counts.get(tier, 1)
         entities = {
             "robot": "robot",
-            "mug": "item",
             "kitchen": "room",
             "living_room": "room",
             "shelf": "surface",
             "table": "surface",
         }
+        for i in range(1, num_items + 1):
+            entities[f"item_{i}"] = "item"
+
         init_facts = [
             {"predicate": "robot_at", "arguments": ["robot", "kitchen"]},
             {"predicate": "connected_rooms", "arguments": ["kitchen", "living_room"]},
+            {"predicate": "connected_rooms", "arguments": ["living_room", "kitchen"]},
             {"predicate": "surface_in_room", "arguments": ["shelf", "kitchen"]},
             {"predicate": "surface_in_room", "arguments": ["table", "living_room"]},
-            {"predicate": "item_on", "arguments": ["mug", "shelf"]},
             {"predicate": "gripper_empty", "arguments": ["robot"]},
         ]
-        goal_facts = [{"predicate": "item_on", "arguments": ["mug", "table"]}]
+        for i in range(1, num_items + 1):
+            init_facts.append({"predicate": "item_on", "arguments": [f"item_{i}", "shelf"]})
+
+        goal_facts = [{"predicate": "item_on", "arguments": ["item_1", "table"]}]
+        prompt = f"Move item_1 from kitchen shelf to living room table in {tier.value} household configuration."
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="household_robotics",
             tier=tier,
-            prompt="Move the mug from the kitchen shelf to the living room table.",
+            prompt=prompt,
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=32,
+            estimated_state_space=32 * num_items,
         )
 
     def _gen_warehouse(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
+        sku_counts = {
+            ComplexityTier.TINY: 1,
+            ComplexityTier.SMALL: 2,
+            ComplexityTier.MEDIUM: 3,
+            ComplexityTier.LARGE: 4,
+            ComplexityTier.STRESS: 5,
+        }
+        num_skus = sku_counts.get(tier, 1)
         entities = {
             "agv_1": "carrier",
-            "box_sku": "sku",
             "bay_storage": "bay",
             "bay_dock": "bay",
             "zone_storage": "zone",
             "zone_dock": "zone",
         }
+        for i in range(1, num_skus + 1):
+            entities[f"sku_{i}"] = "sku"
+
         init_facts = [
             {"predicate": "carrier_at", "arguments": ["agv_1", "zone_storage"]},
             {"predicate": "zone_connected", "arguments": ["zone_storage", "zone_dock"]},
+            {"predicate": "zone_connected", "arguments": ["zone_dock", "zone_storage"]},
             {"predicate": "bay_in_zone", "arguments": ["bay_storage", "zone_storage"]},
             {"predicate": "bay_in_zone", "arguments": ["bay_dock", "zone_dock"]},
-            {"predicate": "sku_stored_in", "arguments": ["box_sku", "bay_storage"]},
             {"predicate": "carrier_empty", "arguments": ["agv_1"]},
             {"predicate": "bay_available", "arguments": ["bay_dock"]},
         ]
-        goal_facts = [{"predicate": "sku_stored_in", "arguments": ["box_sku", "bay_dock"]}]
+        for i in range(1, num_skus + 1):
+            init_facts.append({"predicate": "sku_stored_in", "arguments": [f"sku_{i}", "bay_storage"]})
+
+        goal_facts = [{"predicate": "sku_stored_in", "arguments": ["sku_1", "bay_dock"]}]
+        prompt = f"Move sku_1 from storage bay to dispatch dock in {tier.value} logistics configuration."
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="warehouse",
             tier=tier,
-            prompt="Move box_sku from storage bay to dispatch dock.",
+            prompt=prompt,
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=24,
+            estimated_state_space=24 * num_skus,
         )
 
     def _gen_scheduling(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
+        job_counts = {
+            ComplexityTier.TINY: 2,
+            ComplexityTier.SMALL: 3,
+            ComplexityTier.MEDIUM: 4,
+            ComplexityTier.LARGE: 5,
+            ComplexityTier.STRESS: 6,
+        }
+        num_jobs = job_counts.get(tier, 2)
         entities = {
-            "task_a": "job",
-            "task_b": "job",
             "machine_1": "resource",
             "slot_1": "slot",
             "slot_2": "slot",
         }
+        for i in range(1, num_jobs + 1):
+            entities[f"task_{i}"] = "job"
+
         init_facts = [
-            {"predicate": "job_ready", "arguments": ["task_a"]},
-            {"predicate": "job_ready", "arguments": ["task_b"]},
-            {"predicate": "precedes", "arguments": ["task_a", "task_b"]},
             {"predicate": "resource_available", "arguments": ["machine_1", "slot_1"]},
             {"predicate": "resource_available", "arguments": ["machine_1", "slot_2"]},
         ]
-        goal_facts = [{"predicate": "job_completed", "arguments": ["task_b"]}]
+        for i in range(1, num_jobs + 1):
+            init_facts.append({"predicate": "job_ready", "arguments": [f"task_{i}"]})
+        if num_jobs >= 2:
+            init_facts.append({"predicate": "precedes", "arguments": ["task_1", "task_2"]})
+
+        goal_facts = [{"predicate": "job_completed", "arguments": [f"task_{num_jobs}"]}]
+        prompt = f"Schedule tasks on machine_1 satisfying DAG precedence in {tier.value} configuration."
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="scheduling",
             tier=tier,
-            prompt="Schedule task_a before task_b on machine_1.",
+            prompt=prompt,
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=16,
+            estimated_state_space=16 * (num_jobs - 1),
         )
 
     def _gen_software(self, inst_id: str, tier: ComplexityTier) -> MultiDomainBenchmarkInstance:
@@ -239,18 +334,25 @@ class MultiDomainBenchmarkGenerator:
             "pkg_alpha": "artifact",
             "staging": "environment",
         }
+        if tier in (ComplexityTier.MEDIUM, ComplexityTier.LARGE, ComplexityTier.STRESS):
+            entities["prod"] = "environment"
+
         init_facts = [
             {"predicate": "code_checked_out", "arguments": ["commit_alpha"]},
             {"predicate": "environment_healthy", "arguments": ["staging"]},
         ]
+        if "prod" in entities:
+            init_facts.append({"predicate": "environment_healthy", "arguments": ["prod"]})
+
         goal_facts = [{"predicate": "deployed_to", "arguments": ["pkg_alpha", "staging"]}]
+        prompt = f"Build, test, scan, and deploy commit_alpha to staging environment ({tier.value} pipeline)."
         return MultiDomainBenchmarkInstance(
             instance_id=inst_id,
             domain_id="software_workflow",
             tier=tier,
-            prompt="Build, test, scan, and deploy commit_alpha to staging environment.",
+            prompt=prompt,
             entities=entities,
             initial_facts=init_facts,
             goal_conditions=goal_facts,
-            estimated_state_space=32,
+            estimated_state_space=32 if "prod" not in entities else 64,
         )

@@ -43,7 +43,9 @@ class DomainRouter:
     def __init__(self, registry: Optional[DomainRegistry] = None) -> None:
         self.registry = registry or default_registry
 
-    def route(self, prompt: str) -> DomainRoutingResult:
+    def route(
+        self, prompt: str, explicit_domain_id: Optional[str] = None
+    ) -> DomainRoutingResult:
         """Analyzes user text and returns domain assignment or clarification."""
         p_clean = prompt.strip().lower()
         if not p_clean:
@@ -83,24 +85,36 @@ class DomainRouter:
                 raw_prompt=prompt,
             )
 
-        # 3. Score registered domains
+        # 3. Determine target domain: explicit or auto-scored
         scores: Dict[str, float] = {}
-        for d in self.registry.list_domains():
-            score = 0.0
-            for pattern in d.supported_patterns:
-                if pattern in p_clean:
-                    score += 1.5
-            scores[d.domain_id] = score
+        if explicit_domain_id and explicit_domain_id != "auto":
+            dom = self.registry.get(explicit_domain_id)
+            if not dom:
+                return DomainRoutingResult(
+                    outcome=RoutingOutcome.UNSUPPORTED,
+                    explanation=f"Explicitly requested domain '{explicit_domain_id}' is not registered.",
+                    raw_prompt=prompt,
+                )
+            best_domain_id = dom.domain_id
+            best_score = 5.0
+            scores[best_domain_id] = 5.0
+        else:
+            for d in self.registry.list_domains():
+                score = 0.0
+                for pattern in d.supported_patterns:
+                    if pattern in p_clean:
+                        score += 1.5
+                scores[d.domain_id] = score
 
-        best_domain_id, best_score = max(scores.items(), key=lambda kv: kv[1])
+            best_domain_id, best_score = max(scores.items(), key=lambda kv: kv[1])
 
-        if best_score == 0.0:
-            return DomainRoutingResult(
-                outcome=RoutingOutcome.UNSUPPORTED,
-                candidate_scores=scores,
-                explanation="Could not match instruction keywords to any supported planning domain.",
-                raw_prompt=prompt,
-            )
+            if best_score == 0.0:
+                return DomainRoutingResult(
+                    outcome=RoutingOutcome.UNSUPPORTED,
+                    candidate_scores=scores,
+                    explanation="Could not match instruction keywords to any supported planning domain.",
+                    raw_prompt=prompt,
+                )
 
         # 4. Domain-specific entity & fact extraction
         entities: Dict[str, str] = {}
@@ -108,18 +122,37 @@ class DomainRouter:
         goal_facts: List[FactSchema] = []
         negative_constraints: List[FactSchema] = []
 
-        # Extract negative constraints: "do not move/touch/hold X"
-        neg_match = re.search(r"do not (?:move|touch|hold|disturb) (?:the )?([a-z0-9_]+)", p_clean)
+        # Extract negative constraints: "do not move/touch/hold/visit/enter/deploy/schedule X"
+        neg_match = re.search(
+            r"do not (?:move|touch|hold|disturb|visit|enter|deploy to|schedule on) (?:the )?([a-z0-9_]+)",
+            p_clean,
+        )
         if neg_match:
             prot_obj = neg_match.group(1).replace(" ", "_")
-            entities[prot_obj] = "block" if best_domain_id == "blocks_world" else "item"
-            negative_constraints.append(FactSchema(predicate="holding", arguments=(prot_obj,)))
+            if best_domain_id in ("blocks_world", "blocks"):
+                entities[prot_obj] = "block"
+                negative_constraints.append(FactSchema(predicate="holding", arguments=(prot_obj,)))
+            elif best_domain_id in ("grid_world", "grid"):
+                entities[prot_obj] = "location"
+                negative_constraints.append(FactSchema(predicate="at", arguments=("agent", prot_obj)))
+            elif best_domain_id in ("household", "household_robotics"):
+                entities[prot_obj] = "item"
+                negative_constraints.append(FactSchema(predicate="holding", arguments=("robot", prot_obj)))
+            elif best_domain_id == "warehouse":
+                entities[prot_obj] = "zone"
+                negative_constraints.append(FactSchema(predicate="carrier_at", arguments=("carrier_1", prot_obj)))
+            elif best_domain_id == "scheduling":
+                entities[prot_obj] = "resource"
+                negative_constraints.append(FactSchema(predicate="scheduled_on", arguments=("task_b", prot_obj)))
+            elif best_domain_id == "software_workflow":
+                entities[prot_obj] = "environment"
+                negative_constraints.append(FactSchema(predicate="deployed_to", arguments=("pkg_v1", prot_obj)))
 
-        if best_domain_id == "blocks_world":
+        if best_domain_id in ("blocks_world", "blocks"):
             self._extract_blocks_world(p_clean, entities, initial_facts, goal_facts)
-        elif best_domain_id == "grid_world":
+        elif best_domain_id in ("grid_world", "grid"):
             self._extract_grid_world(p_clean, entities, initial_facts, goal_facts)
-        elif best_domain_id == "household_robotics":
+        elif best_domain_id in ("household", "household_robotics"):
             self._extract_household(p_clean, entities, initial_facts, goal_facts)
         elif best_domain_id == "warehouse":
             self._extract_warehouse(p_clean, entities, initial_facts, goal_facts)
@@ -145,7 +178,7 @@ class DomainRouter:
 
     def _extract_blocks_world(self, text: str, entities: dict, init: list, goal: list) -> None:
         # Default entities
-        for word in ["red_box", "blue_box", "green_box", "glass", "b1", "b2", "b3", "b4"]:
+        for word in ["red_box", "blue_box", "green_box", "yellow_box", "glass", "b1", "b2", "b3", "b4"]:
             if word in text or word.replace("_", " ") in text:
                 entities[word] = "block"
 
@@ -153,11 +186,28 @@ class DomainRouter:
             entities["red_box"] = "block"
             entities["blue_box"] = "block"
 
-        # Initial facts for all blocks on table and clear
-        for b in entities:
-            init.append(FactSchema(predicate="on_table", arguments=(b,)))
-            init.append(FactSchema(predicate="clear", arguments=(b,)))
-        init.append(FactSchema(predicate="handempty", arguments=()))
+        # Check if an explicit initial stack configuration was stated in the prompt
+        # e.g., "the red box is on the green box"
+        init_on_match = re.search(r"(?:the )?([a-z0-9_]+) is on (?:the )?([a-z0-9_]+)", text)
+        if init_on_match:
+            top_init = init_on_match.group(1).replace(" ", "_")
+            bottom_init = init_on_match.group(2).replace(" ", "_")
+            entities[top_init] = "block"
+            entities[bottom_init] = "block"
+            init.append(FactSchema(predicate="on", arguments=(top_init, bottom_init)))
+            init.append(FactSchema(predicate="clear", arguments=(top_init,)))
+            init.append(FactSchema(predicate="on_table", arguments=(bottom_init,)))
+            for b in entities:
+                if b not in (top_init, bottom_init):
+                    init.append(FactSchema(predicate="on_table", arguments=(b,)))
+                    init.append(FactSchema(predicate="clear", arguments=(b,)))
+            init.append(FactSchema(predicate="handempty", arguments=()))
+        else:
+            # Initial facts: all blocks on table and clear
+            for b in entities:
+                init.append(FactSchema(predicate="on_table", arguments=(b,)))
+                init.append(FactSchema(predicate="clear", arguments=(b,)))
+            init.append(FactSchema(predicate="handempty", arguments=()))
 
         # Goals
         stack_match = re.search(r"(?:stack|move|put) (?:the )?([a-z0-9_]+) (?:on|next to) (?:the )?([a-z0-9_]+)", text)
@@ -170,20 +220,30 @@ class DomainRouter:
 
     def _extract_grid_world(self, text: str, entities: dict, init: list, goal: list) -> None:
         entities["agent"] = "agent"
-        # Find cells
-        cells = re.findall(r"cell_[a-z0-9]+|[a-d]\b", text)
-        clean_cells = [f"cell_{c}" if not c.startswith("cell_") else c for c in cells]
+        # Find cells or grid locations (e.g. loc_0_0 or cell_a)
+        cells = re.findall(r"loc_\d+_\d+|cell_[a-z0-9]+|\b[a-d]\b", text)
+        clean_cells = [f"loc_{c}" if (not c.startswith("loc_") and not c.startswith("cell_")) else c for c in cells]
         for c in clean_cells:
             entities[c] = "location"
 
-        from_c = clean_cells[0] if len(clean_cells) > 0 else "cell_a"
-        to_c = clean_cells[1] if len(clean_cells) > 1 else "cell_b"
+        from_c = clean_cells[0] if len(clean_cells) > 0 else "loc_0_0"
+        to_c = clean_cells[1] if len(clean_cells) > 1 else "loc_1_1"
         entities[from_c] = "location"
         entities[to_c] = "location"
 
         init.append(FactSchema(predicate="at", arguments=("agent", from_c)))
         init.append(FactSchema(predicate="connected", arguments=(from_c, to_c)))
-        goal.append(FactSchema(predicate="at", arguments=("agent", to_c)))
+
+        # Check for item pickup/transfer (e.g. key_1)
+        item_match = re.search(r"(key_\d+|item_\d+|package)", text)
+        if item_match:
+            item_name = item_match.group(1)
+            entities[item_name] = "item"
+            init.append(FactSchema(predicate="at_item", arguments=(item_name, to_c)))
+            init.append(FactSchema(predicate="empty_hand", arguments=("agent",)))
+            goal.append(FactSchema(predicate="carrying", arguments=("agent", item_name)))
+        else:
+            goal.append(FactSchema(predicate="at", arguments=("agent", to_c)))
 
     def _extract_household(self, text: str, entities: dict, init: list, goal: list) -> None:
         entities["robot"] = "robot"

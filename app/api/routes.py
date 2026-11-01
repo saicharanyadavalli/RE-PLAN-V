@@ -117,12 +117,11 @@ def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
     from core.world.types import ObjectRegistry
     from interpretation.router import DomainRouter, RoutingOutcome
 
-    domain = registry.get(req.domain_id)
-    if not domain:
-        raise HTTPException(status_code=404, detail=f"Domain '{req.domain_id}' not found.")
-
     router = DomainRouter(registry=registry)
-    routing = router.route(req.prompt or "Stack the red box on the blue box.")
+    routing = router.route(
+        req.prompt or "Stack the red box on the blue box.",
+        explicit_domain_id=req.domain_id if req.domain_id != "auto" else None,
+    )
     if routing.outcome != RoutingOutcome.SUPPORTED:
         return {
             "status": routing.outcome.value,
@@ -130,6 +129,11 @@ def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
             "explanation": routing.explanation,
             "elements": [],
         }
+
+    target_domain_id = req.domain_id if req.domain_id != "auto" else routing.selected_domain_id
+    domain = registry.get(target_domain_id)
+    if not domain:
+        raise HTTPException(status_code=404, detail=f"Domain '{target_domain_id}' not found.")
 
     reg = ObjectRegistry(domain.type_hierarchy)
     for obj_name, obj_type in routing.entities.items():

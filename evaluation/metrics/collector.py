@@ -9,8 +9,13 @@ from core.contracts import EvaluationMetricsSchema
 class MetricsCollector:
     """Computes strictly measured empirical metrics across benchmark executions."""
 
-    def __init__(self, experiment_id: str = "exp_01") -> None:
+    def __init__(
+        self,
+        experiment_id: str = "exp_01",
+        baseline_regeneration_rate: Optional[float] = None,
+    ) -> None:
         self.experiment_id = experiment_id
+        self.baseline_regeneration_rate = baseline_regeneration_rate
         self.records: List[Dict[str, Any]] = []
 
     def record_run(self, result: Dict[str, Any]) -> None:
@@ -58,6 +63,12 @@ class MetricsCollector:
             # Baseline methods that don't do attribution report 0.0
             attr_acc = 0.0
 
+        # Empirical recovery advantage over generic regeneration baseline
+        if self.baseline_regeneration_rate is not None:
+            rec_adv = max(0.0, repair_rate - self.baseline_regeneration_rate)
+        else:
+            rec_adv = 0.0
+
         return EvaluationMetricsSchema(
             experiment_id=self.experiment_id,
             total_instances=n,
@@ -72,5 +83,5 @@ class MetricsCollector:
             avg_nodes_expanded=float(total_nodes / n),
             avg_plan_cost=float(avg_cost),
             fault_attribution_accuracy=attr_acc,
-            recovery_advantage_over_regeneration=0.0,
+            recovery_advantage_over_regeneration=float(rec_adv),
         )

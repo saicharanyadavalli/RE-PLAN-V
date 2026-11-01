@@ -1,16 +1,16 @@
-# RE-PLAN-V: Reliable Explainable Multimodal Planning with Formal Verification and Counterexample-Guided Repair
+# RE-PLAN-V: Reliable Explainable Multi-Domain Planning with Formal Verification and Counterexample-Guided Repair
 
 [![Course](https://img.shields.io/badge/Course-CS%20F407%20Artificial%20Intelligence-indigo.svg)](VIVA_GUIDE.md)
 [![Category](https://img.shields.io/badge/Category-Appendix%20B%3A%20Cross--Area%20(Search%20+%20KRR%20+%20DL)-purple.svg)](VIVA_GUIDE.md)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.1%20App%20Router-black.svg)](frontend/)
 [![WebSocket](https://img.shields.io/badge/Streaming-Bidirectional%20WebSockets-teal.svg)](app/api/websocket.py)
-[![Tests](https://img.shields.io/badge/Tests-143%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-181%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Symbolic Core](https://img.shields.io/badge/Core-Symbolic--First%20Authoritative-success.svg)](core/)
 [![Zero-API Ready](https://img.shields.io/badge/Zero--API-100%25%20Offline%20Ready-emerald.svg)](core/)
 
 > **Research Question**: *"Can counterexample-guided fault attribution and automatic repair improve recovery from initially invalid plans compared with generic plan regeneration?"*  
-> **Empirical Finding**: **YES**. Grounded counterexample-derived constraints achieve a **100.0% recovery rate** compared to **0.0% recovery** for unguided regeneration on deterministic state spaces with sub-5 millisecond search latency.
+> **Empirical Finding**: **YES**. Grounded counterexample-derived constraints achieve a **100.0% recovery rate** on initially invalid candidate plans compared to **50.0% recovery** for unguided generic plan regeneration, yielding a **+50.0% recovery advantage** with low millisecond repair latency.
 
 ---
 
@@ -74,7 +74,7 @@ flowchart TD
     
     Search --> |Candidate Action Trajectory| Verifier{"Formal STRIPS Verifier\n(Preconditions, Mutexes, Invariants)"}
     
-    Verifier --> |Mathematically Valid| Dispatch["Final Verified Plan\n(100% Safe Robotic Dispatch)"]
+    Verifier --> |Mathematically Valid| Dispatch["Final Verified Plan\n(Verified Under Model Assumptions)"]
     
     Verifier --> |Violation Detected| CEx["Minimal Counterexample Witness\n(Failing Step k, Offending Action, Violated Precondition)"]
     
@@ -117,7 +117,7 @@ A central innovation of RE-PLAN-V is proving that **massive 70B cloud models are
 1. **Lightweight & Edge-Deployable:** A 2-billion parameter model (e.g., Google Gemma 2 2B or Qwen 2.5 1.5B) requires only **~1.8 GB of VRAM** (or 4-bit quantized ~1.2 GB), allowing it to run smoothly on edge robotic hardware or modest laptops.
 2. **Speed & Efficiency:** Inference latency is **< 100 ms**, compared to 1–3 seconds for cloud APIs.
 3. **Formal Verification Safety Net:** Because the LLM's role is strictly confined to grammar translation, any potential hallucination is caught and rejected by our STRIPS verifier.
-4. **Guaranteed 100% Plan Safety:** Pairing an efficient 2B model with RE-PLAN-V's authoritative symbolic verifier delivers **100% mathematically verified plans**, outperforming even raw GPT-4 at zero API cost.
+4. **Formally Verified Plan Correctness:** Pairing an efficient 2B model with RE-PLAN-V's authoritative symbolic verifier delivers **formally verified symbolic plans under declared domain invariants**, catching any neural hallucination at zero API cost.
 
 ---
 
@@ -212,7 +212,7 @@ python -m app.main --mode benchmark --instances 5 --seed 42
 # Execute full pytest suite with coverage
 pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app --cov-report=term-missing
 ```
-*Result:* **143 passing tests**, **87%+ overall coverage**, 100% test pass rate.
+*Result:* **181 passing tests**, **87%+ overall coverage**, 100% test pass rate.
 
 ---
 
@@ -232,18 +232,29 @@ pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app 
 ---
 
 ## 9. Empirical Research Benchmark Results
+ 
+Measured empirical results across $N=10$ benchmark problem instances from `evaluation/reports/primary_research_experiment.json`:
 
-Measured empirical results across $N=20$ problem instances from `evaluation/reports/primary_research_experiment.json`:
-
-| Baseline / Method | Mathematical Formulation | Valid Plan Rate | Goal Success | Fault Recovery Rate | Avg Search Time |
+| Baseline / Method | Mathematical Formulation | Valid Plan Rate | Goal Success | Fault Recovery Rate | Avg Search / Repair Time |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **B0: Direct Neural** | Raw unverified LLM token generation | 0.0% | 0.0% | N/A | 0.19 ms |
-| **B1: Formalized Planner** | Formalized task + $A^*$ search | 100.0% | 100.0% | N/A | 1.56 ms |
-| **B2: Verifier Reject-Only** | Formal verifier reject-only (no repair) | 0.0% | 0.0% | 0.0% | 0.13 ms |
-| **B3: Generic Regeneration** | Unguided search re-invocation | 0.0%* | 0.0%* | 0.0% | 1.86 ms |
-| **OURS: RE-PLAN-V** | **Counterexample-guided pruning repair** | **100.0%** | **100.0%** | **100.0%** | **3.26 ms** |
+| **B0: Direct Neural** | Raw unverified LLM token proposal | 0.0% | 0.0% | 0.0% | 0.09 ms |
+| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 100.0% | 100.0% | 100.0%* | 16.28 ms |
+| **B2: Verifier Reject-Only** | Formal verifier reject-only (no repair) | 0.0% | 0.0% | 0.0% | 0.07 ms |
+| **B3: Generic Regeneration** | Unguided candidate plan re-sampling | 50.0% | 50.0% | 50.0% | 10.37 ms |
+| **OURS: RE-PLAN-V** | **Counterexample-guided pruning repair** | **100.0%** | **100.0%** | **100.0%** | **18.42 ms** |
 
-*\*Note on Baseline B3:* In deterministic search spaces, unguided regeneration without constraints repeats identical failure paths, resulting in 0% recovery. In contrast, RE-PLAN-V dynamically prunes the offending state-action branch, achieving a **100.0% recovery rate**.
+**Measured Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0%**
+
+### Component Ablation Analysis
+
+| Ablation Configuration | Instances | Repair Success Rate | Avg Iterations | Key Insight |
+| :--- | :---: | :---: | :---: | :--- |
+| **Full System (OURS)** | 10 | **100.0%** | **1.00** | Structured witness prunes failing state-action transition |
+| **Without Verifier** | 10 | 100.0%* | 0.00 | *Blind trust without verification (unsafe in reality) |
+| **Without Counterexample** | 10 | **0.0%** | 5.00 | Reaches max iterations without finding targeted repair |
+| **Without Attribution** | 10 | 100.0% | 1.00 | Heuristic constraint pruning still works for simple failures |
+| **Without Repair** | 10 | **0.0%** | 0.00 | Verifier rejects immediately, cannot recover |
+| **Generic Regeneration (B3)** | 10 | **50.0%** | 3.20 | Unguided sampling struggles with multi-block obstacles |
 
 ---
 

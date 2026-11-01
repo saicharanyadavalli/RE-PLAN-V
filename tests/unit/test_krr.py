@@ -119,3 +119,35 @@ def test_forward_chaining_cycle_termination():
     assert Fact("connected", ["loc1", "loc2"]) in closure
     assert Fact("connected", ["loc2", "loc1"]) in closure
     assert len(closure) == 2  # Fixpoint reached without infinite loop
+
+
+def test_cnf_conversion_and_resolution_refutation():
+    """Verifies First-Order CNF conversion and resolution refutation.
+    
+    Knowledge Base:
+    1. fragile(?x) :- glass(?x)  -> CNF: ~glass(?x) | fragile(?x)
+    2. glass(item1)              -> CNF: glass(item1)
+    Goal to prove: fragile(item1)
+    """
+    from core.krr.resolution import CNFClause, resolve, resolution_refutation, rule_to_cnf
+
+    rule_fragile = Rule(
+        head=Fact("fragile", ["?x"]),
+        body=[Fact("glass", ["?x"])],
+        name="glass_is_fragile",
+    )
+    cnf_rule = rule_to_cnf(rule_fragile)
+    assert str(cnf_rule) == "~glass(?x) | fragile(?x)"
+
+    fact_clause = CNFClause([Fact("glass", ["item1"])])
+
+    # Direct resolution test
+    resolvents = resolve(cnf_rule, fact_clause)
+    assert len(resolvents) == 1
+    res_clause, _ = resolvents[0]
+    assert str(res_clause) == "fragile(item1)"
+
+    # Full refutation test
+    is_proved, trace = resolution_refutation([cnf_rule, fact_clause], Fact("fragile", ["item1"]))
+    assert is_proved is True
+    assert any("CONTRADICTION" in step for step in trace)

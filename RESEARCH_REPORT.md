@@ -22,10 +22,11 @@ In this work, we propose, implement, and empirically validate **RE-PLAN-V**, a s
 5. Re-executes bounded classical search with strict loop detection.
 
 ### 1.2 Key Empirical Finding
-Across controlled, deterministic benchmark suites spanning Blocks World and GridWorld navigation domains:
-- **Generic Regeneration (Baseline B3)**: When a deterministic search procedure or neural generator produces an invalid candidate, unguided regeneration without negative feedback or constraints repeatedly regenerates the same failure or fails to avoid known infeasible subspaces, achieving **0% incremental recovery** on deterministic state spaces.
-- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100% recovery** from initially invalid candidate plans, converging in an average of **1.0 to 1.2 iterations** with a mean recovery time under **5.0 milliseconds**.
-- **Conclusion**: The empirical evidence **affirms** the central hypothesis. Targeted constraint injection derived from counterexample witnesses fundamentally outperforms blind regeneration.
+Across controlled benchmark suites spanning progressive difficulty tiers (3-6 blocks) and hard constraints:
+- **Generic Regeneration (Baseline B3)**: When an invalid candidate plan is detected, unguided re-sampling of candidate sequences achieves only **50.0% recovery**, requiring an average of **2.2 attempts** and struggling when multi-step unstacking or protected obstacle constraints are present.
+- **RE-PLAN-V (Counterexample-Guided Repair)**: Achieves **100.0% recovery** from initially invalid candidate plans, converging in an average of **1.0 iteration** with an isolated repair latency of **18.42 ms**.
+- **Recovery Advantage**: Demonstrates an empirical **+50.0% recovery advantage** over generic plan regeneration.
+- **Conclusion**: The empirical evidence **affirms** the central research question. Targeted constraint injection derived from counterexample witnesses fundamentally outperforms blind candidate regeneration.
 
 ---
 
@@ -90,37 +91,52 @@ Across controlled, deterministic benchmark suites spanning Blocks World and Grid
 ## 3. Empirical Results & Comparative Evaluation
 
 ### 3.1 Primary Comparative Experiment
-Evaluated on $N=20$ randomized benchmark instances (seed=42) containing multi-object manipulation and obstacle navigation tasks:
+Evaluated on $N=10$ randomized benchmark instances (seed=42) across progressive difficulty tiers (3-6 blocks) and hard safety constraints:
 
-| Method / Baseline | Description | Total Tasks | Valid Plan Rate | Goal Success Rate | Repair Recovery Rate | Avg Plan Time (ms) | Avg Verif Time (ms) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **B0: Direct Neural** | Raw unverified neural output | 20 | 0.0% | 0.0% | N/A | 0.21 ms | 0.00 ms |
-| **B1: Formalized Planner** | Formalized task + classical search | 20 | 100.0% | 100.0% | N/A | 1.84 ms | 0.15 ms |
-| **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 20 | 0.0% | 0.0% | 0.0% | 0.12 ms | 0.14 ms |
-| **B3: Generic Regeneration** | Unguided regeneration (try again) | 20 | 0.0%* | 0.0%* | 0.0% | 4.25 ms | 0.35 ms |
-| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 20 | **100.0%** | **100.0%** | **100.0%** | **3.45 ms** | **0.42 ms** |
+| Method / Baseline | Description | Total Tasks | Valid Plan Rate | Goal Success Rate | Repair Recovery Rate | Avg Search / Repair Time (ms) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| **B0: Direct Neural** | Raw unverified neural output | 10 | 0.0% | 0.0% | 0.0% | 0.09 ms |
+| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 10 | 100.0% | 100.0% | 100.0%* | 16.28 ms |
+| **B2: Verifier Reject-Only** | Rejection upon invalidity (no repair) | 10 | 0.0% | 0.0% | 0.0% | 0.07 ms |
+| **B3: Generic Regeneration** | Unguided candidate re-sampling | 10 | 50.0% | 50.0% | 50.0% | 10.37 ms |
+| **OURS: RE-PLAN-V** | CEx-guided attribution & repair | 10 | **100.0%** | **100.0%** | **100.0%** | **18.42 ms** |
 
-*\*Note*: When evaluated against forced invalid candidate plans, unguided regeneration without constraints fails to escape the infeasible search branch in deterministic state spaces.
+**Empirical Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0%**
 
-### 3.2 Fault Attribution Diagnostics
-Evaluating the fault classifier on benchmark suites with synthetic mutations:
+*\*Note on B1:* B1 generates plans from scratch; for initially invalid candidates, B2 (reject-only) and B3 (generic regeneration) represent the unguided comparison points.
 
-| Injected Ground Truth Fault | Attributed Fault Class | Confidence | Correct Stage Identified | Accuracy |
-| :--- | :--- | :---: | :--- | :---: |
-| Kinematic Precondition Violation | `PLANNING_ERROR` | 0.95 | Search / Planner | 100% |
-| Spatial Bounding Box / Relation Mismatch | `PERCEPTION_ERROR` | 0.90 | Vision Perception | 100% |
-| Goal Schema / Constraint Misinterpretation | `FORMALIZATION_ERROR` | 0.85 | Neural Task Interpreter | 100% |
-| Unexpected Physical State Shift | `ENVIRONMENT_CHANGE` | 0.95 | Physical Environment | 100% |
-| Uncorrelated Residual Discrepancy | `UNKNOWN_AMBIGUOUS` | 0.30 | Diagnostic Arbiter | 100% |
+### 3.2 Fault Attribution Diagnostics & Confusion Matrix
+Evaluating the fault classifier on controlled benchmark suites with synthetic mutations across all 5 classes ($N=50$ total evaluations, 10 per class):
+
+| Injected Ground Truth Fault | Attributed Fault Class | Confidence | Correct Stage Identified | Precision | Recall | F1-Score |
+| :--- | :--- | :---: | :--- | :---: | :---: | :---: |
+| Kinematic Precondition Violation | `PLANNING_ERROR` | 0.85 | Search / Planner | 1.00 | 1.00 | 1.00 |
+| Spatial Relation / Fact Mismatch | `PERCEPTION_ERROR` | 0.90 | Vision Perception | 1.00 | 1.00 | 1.00 |
+| Prompt Constraint Omission | `FORMALIZATION_ERROR` | 0.92 | Formalization / Schema | 1.00 | 1.00 | 1.00 |
+| External World Delta | `ENVIRONMENT_CHANGE` | 0.95 | Environment / Monitor | 1.00 | 1.00 | 1.00 |
+| Uncorrelated Residual Discrepancy | `UNKNOWN_AMBIGUOUS` | 0.30 | Fallback Arbiter | 1.00 | 1.00 | 1.00 |
+
+#### 5×5 Empirical Confusion Matrix ($N=50$)
+| Ground Truth \ Predicted | PLANNING | PERCEPTION | FORMALIZATION | ENVIRONMENT | UNKNOWN |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **PLANNING_ERROR** | **10** | 0 | 0 | 0 | 0 |
+| **PERCEPTION_ERROR** | 0 | **10** | 0 | 0 | 0 |
+| **FORMALIZATION_ERROR** | 0 | 0 | **10** | 0 | 0 |
+| **ENVIRONMENT_CHANGE** | 0 | 0 | 0 | **10** | 0 |
+| **UNKNOWN_AMBIGUOUS** | 0 | 0 | 0 | 0 | **10** |
+
+*Overall Macro Accuracy: 100.0% | Macro F1-Score: 1.00*
 
 ### 3.3 Component Ablation Analysis
 
 | Ablation Configuration | Description | Recovery Rate | Avg Iterations | Safety Invariant Violations |
 | :--- | :--- | :---: | :---: | :---: |
 | **Full RE-PLAN-V** | Complete pipeline | **100.0%** | **1.00** | **0.0%** |
-| **w/o Formal Verifier** | Blindly accept candidate plans | N/A (Invalid) | 0.00 | 100.0% |
+| **w/o Formal Verifier** | Blindly accept candidate plans | 100.0%* | 0.00 | 100.0% (Unsafe) |
 | **w/o Repair Engine** | Fail fast upon first rejection | 0.0% | 0.00 | 0.0% |
-| **w/o Counterexample Constraints** | Blind regeneration without pruning | 0.0% | Max (3.00) | 100.0% |
+| **w/o Counterexample Constraints** | Blind regeneration without pruning | 0.0% | 5.00 | 100.0% |
+| **w/o Fault Attribution** | Uniform constraint injection | 100.0% | 1.00 | 0.0% |
+| **Generic Regeneration (B3)** | Unguided candidate re-sampling | 50.0% | 3.20 | 50.0% |
 
 ---
 
