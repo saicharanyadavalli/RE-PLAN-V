@@ -85,6 +85,8 @@ class PipelineOrchestrator:
 
     def __init__(
         self,
+        domain: Optional[Domain] = None,
+        domain_id: Optional[str] = None,
         llm_provider: Optional[BaseLLMProvider] = None,
         validator: Optional[ConsistencyValidator] = None,
         verifier: Optional[PlanVerifier] = None,
@@ -92,7 +94,13 @@ class PipelineOrchestrator:
         max_interpret_retries: int = 3,
         max_backtracks: int = 2,
     ) -> None:
-        self.domain = create_blocks_world_domain()
+        from core.domains import registry
+        if domain is not None:
+            self.domain = domain
+        elif domain_id is not None:
+            self.domain = registry.get(domain_id) or create_blocks_world_domain()
+        else:
+            self.domain = create_blocks_world_domain()
         self.llm_provider = llm_provider or MockLLMProvider()
         self.validator = validator or ConsistencyValidator()
         self.verifier = verifier or PlanVerifier()
@@ -112,6 +120,7 @@ class PipelineOrchestrator:
         force_invalid_first_candidate: bool = False,
         provider_type: Optional[str] = None,
         llm_model: Optional[str] = None,
+        domain_id: Optional[str] = None,
     ) -> PipelineExecutionResult:
         """Executes the full Retry Tree pipeline from natural language prompt to verified plan.
 
@@ -123,6 +132,23 @@ class PipelineOrchestrator:
         """
         start_time = time.perf_counter()
         trace = PipelineDecisionTrace()
+
+        # ──── Resolve Active Domain ─────────────────────────────────────
+        active_domain = self.domain
+        if domain_id:
+            from core.domains import registry
+            if domain_id == "auto":
+                from interpretation.router import DomainRouter
+                router = DomainRouter(registry=registry)
+                routing = router.route(prompt)
+                if routing.selected_domain_id:
+                    matched = registry.get(routing.selected_domain_id)
+                    if matched:
+                        active_domain = matched
+            else:
+                matched = registry.get(domain_id)
+                if matched:
+                    active_domain = matched
 
         # ──── Resolve LLM provider ─────────────────────────────────────
         import os
@@ -163,11 +189,11 @@ class PipelineOrchestrator:
                     if hasattr(active_provider, 'interpret_with_retry'):
                         proposal, provider_name = active_provider.interpret_with_retry(
                             prompt=prompt,
-                            domain=self.domain,
+                            domain=active_domain,
                             validation_errors=last_validation_errors,
                         )
                     else:
-                        proposal = active_provider.interpret(prompt, self.domain)
+                        proposal = active_provider.interpret(prompt, active_domain)
                         provider_name = provider_type
                     t_ms = (time.perf_counter() - t0) * 1000.0
 
@@ -198,7 +224,7 @@ class PipelineOrchestrator:
 
                     if attempt >= self.max_interpret_retries:
                         # Last resort: use mock fallback
-                        proposal = self.llm_provider.interpret(prompt, self.domain)
+                        proposal = self.llm_provider.interpret(prompt, active_domain)
                         provider_name = "mock_fallback"
                         trace.stage_trace.append(StageAttemptRecord(
                             stage="INTERPRET",
@@ -210,7 +236,7 @@ class PipelineOrchestrator:
                         ))
 
             if proposal is None:
-                proposal = self.llm_provider.interpret(prompt, self.domain)
+                proposal = self.llm_provider.interpret(prompt, active_domain)
                 provider_name = "mock_fallback"
 
             # Optional Vision perception integration
@@ -222,7 +248,7 @@ class PipelineOrchestrator:
 
             # ─── Stage 2: VALIDATE (with retry-re-prompt) ─────────────
             t1 = time.perf_counter()
-            val_res = self.validator.validate(proposal, self.domain)
+            val_res = self.validator.validate(proposal, active_domain)
             t_val_ms = (time.perf_counter() - t1) * 1000.0
 
             if not val_res.is_valid:
@@ -280,7 +306,7 @@ class PipelineOrchestrator:
             best_provider_name = provider_name
 
             # ─── Stage 3: PLAN (with cascade) ─────────────────────────
-            problem = self.validator.convert_to_problem(proposal, self.domain)
+            problem = self.validator.convert_to_problem(proposal, active_domain)
 
             # Build planner cascade: start with requested algorithm, then add others
             cascade = [algorithm]
@@ -295,7 +321,7 @@ class PipelineOrchestrator:
                 t2 = time.perf_counter()
                 try:
                     planner = get_planner_by_name(algo_name)
-                    plan_result = planner.search(problem, self.domain)
+                    plan_result = planner.search(problem, active_domain)
                     t_plan_ms = (time.perf_counter() - t2) * 1000.0
 
                     if plan_result.is_success:
@@ -390,7 +416,7 @@ class PipelineOrchestrator:
 
             # ─── Stage 4: VERIFY ──────────────────────────────────────
             t3 = time.perf_counter()
-            v_res = self.verifier.verify(problem, self.domain, candidate)
+            v_res = self.verifier.verify(problem, active_domain, candidate)
             t_verif_ms = (time.perf_counter() - t3) * 1000.0
 
             cex = None
@@ -431,7 +457,7 @@ class PipelineOrchestrator:
                 self.replanning_engine.planner = planner
                 replan_res = self.replanning_engine.run_repair_loop(
                     problem=problem,
-                    domain=self.domain,
+                    domain=active_domain,
                     initial_candidate=candidate,
                     natural_language_prompt=prompt,
                 )

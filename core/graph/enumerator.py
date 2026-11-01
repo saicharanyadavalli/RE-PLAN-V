@@ -73,20 +73,8 @@ class CompleteReachableGraphEnumerator:
 
             curr_state, depth = worklist.popleft()
             curr_id = domain.canonical_state_key(curr_state)
-            nodes[curr_id].expanded = True
             if depth > max_depth:
                 max_depth = depth
-
-            # Check node and edge limits
-            if len(nodes) >= self.max_nodes:
-                is_complete = False
-                truncation_reason = "MAX_NODES_EXCEEDED"
-                break
-
-            if len(edges) >= self.max_edges:
-                is_complete = False
-                truncation_reason = "MAX_EDGES_EXCEEDED"
-                break
 
             applicable = sorted(
                 domain.applicable_actions(curr_state, problem.registry),
@@ -95,11 +83,20 @@ class CompleteReachableGraphEnumerator:
             if not applicable and not nodes[curr_id].is_goal:
                 nodes[curr_id].is_dead_end = True
 
+            curr_fully_expanded = True
             for action in applicable:
+                # Check timeout inside action expansion
+                if (time.perf_counter() - start_time) >= self.timeout_seconds:
+                    is_complete = False
+                    truncation_reason = "TIMEOUT"
+                    curr_fully_expanded = False
+                    break
+
                 # Check edge limit before generating transitions
                 if len(edges) >= self.max_edges:
                     is_complete = False
                     truncation_reason = "MAX_EDGES_EXCEEDED"
+                    curr_fully_expanded = False
                     break
 
                 # Check problem-level hard constraints
@@ -123,8 +120,30 @@ class CompleteReachableGraphEnumerator:
                     continue
 
                 next_id = domain.canonical_state_key(next_state)
-                edge_sig = f"{curr_id}::{action.to_string()}::{next_id}"
 
+                if next_id in seen_states:
+                    cycles_detected += 1
+                    duplicate_states_pruned += 1
+                else:
+                    # Check node limit BEFORE creating target node and edge to guarantee endpoint exists
+                    if len(nodes) >= self.max_nodes:
+                        is_complete = False
+                        truncation_reason = "MAX_NODES_EXCEEDED"
+                        curr_fully_expanded = False
+                        break
+
+                    seen_states[next_id] = next_state
+                    is_goal = problem.is_goal_satisfied(next_state)
+                    nodes[next_id] = GraphNode(
+                        node_id=next_id,
+                        facts=sorted([f.to_string() for f in next_state.facts]),
+                        depth=depth + 1,
+                        is_goal=is_goal,
+                        summary=domain.render_state_summary(next_state),
+                    )
+                    worklist.append((next_state, depth + 1))
+
+                edge_sig = f"{curr_id}::{action.to_string()}::{next_id}"
                 if edge_sig not in seen_edges:
                     seen_edges.add(edge_sig)
                     edges.append(
@@ -139,33 +158,18 @@ class CompleteReachableGraphEnumerator:
                         )
                     )
 
-                if next_id in seen_states:
-                    cycles_detected += 1
-                    duplicate_states_pruned += 1
-                else:
-                    if len(nodes) >= self.max_nodes:
-                        is_complete = False
-                        truncation_reason = "MAX_NODES_EXCEEDED"
-                        break
-
-                    seen_states[next_id] = next_state
-                    is_goal = problem.is_goal_satisfied(next_state)
-                    nodes[next_id] = GraphNode(
-                        node_id=next_id,
-                        facts=sorted([f.to_string() for f in next_state.facts]),
-                        depth=depth + 1,
-                        is_goal=is_goal,
-                        summary=domain.render_state_summary(next_state),
-                    )
-                    worklist.append((next_state, depth + 1))
-
-            if not is_complete:
+            if curr_fully_expanded:
+                nodes[curr_id].expanded = True
+            else:
+                nodes[curr_id].partially_expanded = True
+                nodes[curr_id].is_boundary = True
                 break
 
-        # If truncated, mark any remaining unexpanded frontier nodes as boundary
-        if not is_complete:
+        # If truncated or frontier remaining, mark unexpanded/partially-expanded nodes as boundary
+        if not is_complete or len(worklist) > 0:
+            is_complete = False
             for n_id, n in nodes.items():
-                if not n.expanded:
+                if not n.expanded or n.partially_expanded:
                     n.is_boundary = True
 
         total_time_ms = (time.perf_counter() - start_time) * 1000.0

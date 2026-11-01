@@ -126,7 +126,7 @@ class BlocksWorldDomain(BaseDomain):
             default_invariants=[],
             task_examples=examples,
             supported_patterns=[
-                "stack", "unstack", "pick up", "put down", "tower", "clear", "table", "block"
+                "stack", "unstack", "pick up", "put down", "tower", "clear", "table", "block", "box", "boxes", "glass"
             ],
             unsupported_features=[
                 "continuous rotation", "sub-millimeter friction", "deformable physics"

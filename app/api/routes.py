@@ -18,6 +18,7 @@ experiment_runner = ExperimentRunner()
 
 class PipelineRequest(BaseModel):
     prompt: str = "Move the red box next to the blue box. Do not move the glass."
+    domain_id: Optional[str] = "auto"
     algorithm: str = "A*"
     force_invalid_first_candidate: bool = False
     provider_type: str = "mock"  # "mock", "ollama", "gemini", "openai"
@@ -38,6 +39,7 @@ def run_pipeline(req: PipelineRequest) -> PipelineExecutionResult:
             force_invalid_first_candidate=req.force_invalid_first_candidate,
             provider_type=req.provider_type,
             llm_model=req.llm_model,
+            domain_id=req.domain_id,
         )
         return result
     except Exception as e:
@@ -164,6 +166,7 @@ def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
 
 class FormalizeRequest(BaseModel):
     prompt: str = "Move the red box next to the blue box. Do not move the glass."
+    domain_id: Optional[str] = "blocks_world"
     provider: str = "gemini"  # "gemini", "lmstudio", "ollama", "mock"
     api_key: Optional[str] = None
     model: Optional[str] = None
@@ -173,9 +176,13 @@ class FormalizeRequest(BaseModel):
 def test_formalize(req: FormalizeRequest) -> Dict[str, Any]:
     """Dedicated endpoint to test natural language formalization via Gemini or local models."""
     from interpretation.llm.live import LiveLLMProvider
-    from core.actions.domain import create_blocks_world_domain
+    from core.domains import registry
 
-    domain = create_blocks_world_domain()
+    target_domain = registry.get(req.domain_id or "blocks_world")
+    if not target_domain:
+        from core.actions.domain import create_blocks_world_domain
+        target_domain = create_blocks_world_domain()
+
     provider = LiveLLMProvider(
         provider=req.provider,
         api_key=req.api_key,
@@ -183,7 +190,7 @@ def test_formalize(req: FormalizeRequest) -> Dict[str, Any]:
     )
 
     try:
-        proposal = provider.interpret(req.prompt, domain)
+        proposal = provider.interpret(req.prompt, target_domain)
         return {
             "status": "success",
             "provider": req.provider,

@@ -20,7 +20,7 @@ class Domain:
         type_hierarchy: Optional[TypeHierarchy] = None,
         description: str = "",
     ) -> None:
-        self.name = name.strip().lower()
+        self.name = name.strip()
         self.actions = {a.name: a for a in actions}
         self.predicates = {p.name: p for p in predicates}
         self.type_hierarchy = type_hierarchy or TypeHierarchy()
@@ -31,6 +31,39 @@ class Domain:
 
     def get_all_actions(self) -> List[ActionDefinition]:
         return list(self.actions.values())
+
+    @property
+    def domain_id(self) -> str:
+        return getattr(self, "_domain_id", self.name)
+
+    @domain_id.setter
+    def domain_id(self, val: str) -> None:
+        self._domain_id = val
+
+    def applicable_actions(self, state: Any, registry: Any) -> List[GroundAction]:
+        from core.actions.generator import LegalActionGenerator
+        generator = LegalActionGenerator(list(self.actions.values()), registry)
+        return generator.get_applicable_actions(state)
+
+    def apply_action(self, state: Any, action: GroundAction) -> Tuple[Any, Optional[str]]:
+        from core.actions.transition import apply_transition
+        return apply_transition(state, action)
+
+    def check_invariants(self, state: Any) -> Tuple[bool, Optional[str]]:
+        invariants = getattr(self, "default_invariants", [])
+        for inv in invariants:
+            ok, msg = inv.check(state)
+            if not ok:
+                return False, msg
+        return True, None
+
+    def canonical_state_key(self, state: Any) -> str:
+        import hashlib
+        facts_str = "|".join(sorted(f.to_string() for f in state.facts))
+        return hashlib.sha256(facts_str.encode("utf-8")).hexdigest()[:16]
+
+    def render_state_summary(self, state: Any) -> str:
+        return f"{len(state.facts)} facts"
 
 
 # ==============================================================================

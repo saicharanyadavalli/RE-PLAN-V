@@ -126,3 +126,39 @@ def test_logger_and_config():
     logger = get_logger("test_replan", json_mode=False)
     assert logger.name == "test_replan"
     assert default_config.planning.default_algorithm == "A*"
+
+
+def test_contract_serialization_round_trips():
+    import json
+    from core.graph.models import GraphNode, GraphEdge, GraphStats, ReachableStateGraph
+
+    # FactSchema round trip
+    f = FactSchema(predicate="holding", arguments=("b1",), is_negated=False)
+    f_json = f.model_dump_json()
+    f_restored = FactSchema.model_validate_json(f_json)
+    assert f == f_restored
+
+    # SymbolicStateSchema round trip
+    st = SymbolicStateSchema(facts=(f,), objects={"b1": "block"}, step_index=2)
+    st_json = st.model_dump_json()
+    st_restored = SymbolicStateSchema.model_validate_json(st_json)
+    assert st == st_restored
+
+    # PlanSchema round trip
+    act = GroundActionSchema(name="pick_up", arguments=("b1",), cost=1.0)
+    plan = PlanSchema(actions=[act], algorithm="A*", total_cost=1.0, is_success=True)
+    plan_json = plan.model_dump_json()
+    plan_restored = PlanSchema.model_validate_json(plan_json)
+    assert plan == plan_restored
+
+    # Graph models round trip
+    node = GraphNode(node_id="n1", facts=["on_table(b1)"], depth=0, is_initial=True, is_goal=False, partially_expanded=False)
+    edge = GraphEdge(edge_id="e1", source_id="n1", target_id="n2", action_name="pick_up", action_args=["b1"], action_label="pick_up(b1)", cost=1.0)
+    stats = GraphStats(total_nodes=1, total_edges=1, is_complete=True)
+    graph = ReachableStateGraph(graph_id="g1", domain_id="blocks_world", problem_name="test_p", nodes={"n1": node}, edges=[edge], stats=stats)
+    graph_json = graph.model_dump_json()
+    graph_restored = ReachableStateGraph.model_validate_json(graph_json)
+    assert graph_restored.graph_id == "g1"
+    assert "n1" in graph_restored.nodes
+    assert len(graph_restored.edges) == 1
+    assert graph_restored.edges[0].action_label == "pick_up(b1)"

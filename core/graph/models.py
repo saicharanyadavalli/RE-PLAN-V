@@ -16,6 +16,7 @@ class GraphNode(BaseModel):
     is_dead_end: bool = False
     is_boundary: bool = False
     expanded: bool = False
+    partially_expanded: bool = False
     summary: str = ""
     g_cost: Optional[float] = None
     h_cost: Optional[float] = None
@@ -71,7 +72,7 @@ class ReachableStateGraph(BaseModel):
                 classes.append("goal")
             if n.is_dead_end:
                 classes.append("dead_end")
-            if n.is_boundary:
+            if n.is_boundary or n.partially_expanded:
                 classes.append("boundary")
 
             cy_elements.append({
@@ -82,7 +83,9 @@ class ReachableStateGraph(BaseModel):
                     "is_initial": n.is_initial,
                     "is_goal": n.is_goal,
                     "is_dead_end": n.is_dead_end,
-                    "is_boundary": n.is_boundary,
+                    "is_boundary": n.is_boundary or n.partially_expanded,
+                    "partially_expanded": n.partially_expanded,
+                    "expanded": n.expanded,
                     "facts": n.facts,
                 },
                 "classes": " ".join(classes),

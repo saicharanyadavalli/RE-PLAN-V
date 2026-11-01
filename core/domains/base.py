@@ -10,6 +10,7 @@ import hashlib
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from core.actions.definition import ActionDefinition
+from core.actions.domain import Domain
 from core.actions.generator import LegalActionGenerator
 from core.actions.instantiation import GroundAction
 from core.actions.transition import apply_transition
@@ -19,7 +20,7 @@ from core.world.state import SymbolicState
 from core.world.types import ObjectRegistry, TypeHierarchy
 
 
-class BaseDomain:
+class BaseDomain(Domain):
     """Abstract base domain providing authoritative action schemas, state-transition
 
     semantics, invariant checking, and canonical serialization.
@@ -39,13 +40,15 @@ class BaseDomain:
         supported_patterns: Sequence[str] = (),
         unsupported_features: Sequence[str] = (),
     ) -> None:
+        super().__init__(
+            name=name,
+            actions=actions,
+            predicates=predicates,
+            type_hierarchy=type_hierarchy,
+            description=description,
+        )
         self.domain_id = domain_id.strip().lower()
-        self.name = name.strip()
         self.version = version.strip()
-        self.description = description.strip()
-        self.type_hierarchy = type_hierarchy or TypeHierarchy()
-        self.predicates = {p.name: p for p in predicates}
-        self.actions = {a.name: a for a in actions}
         self.default_invariants = list(default_invariants)
         self.task_examples = list(task_examples)
         self.supported_patterns = list(supported_patterns)

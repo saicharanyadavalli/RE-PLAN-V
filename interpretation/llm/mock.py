@@ -14,6 +14,23 @@ class MockLLMProvider(BaseLLMProvider):
 
     def interpret(self, prompt: str, domain: Domain) -> TaskProposalSchema:
         prompt_lower = prompt.lower().strip()
+        domain_id = getattr(domain, "domain_id", getattr(domain, "name", "blocks_world")).lower()
+
+        # Multi-domain dispatch for non-blocks registered domains
+        if domain_id not in ("blocks_world", "blocks"):
+            from interpretation.router import DomainRouter, RoutingOutcome
+            router = DomainRouter()
+            routing = router.route(prompt, explicit_domain_id=domain_id)
+            if routing.outcome == RoutingOutcome.SUPPORTED:
+                return TaskProposalSchema(
+                    task_id=f"mock_{domain_id}_task",
+                    raw_prompt=prompt,
+                    entities=routing.entities,
+                    initial_facts=routing.initial_facts,
+                    goal_facts=routing.goal_facts,
+                    negative_constraints=routing.negative_constraints,
+                    confidence=routing.domain_confidence,
+                )
 
         # 1. 4-Block Tower Assembly
         if "4-block" in prompt_lower or ("yellow" in prompt_lower and "green" in prompt_lower and "blue" in prompt_lower and "red" in prompt_lower):

@@ -83,6 +83,11 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                     "confidence": routing.domain_confidence,
                 })
 
+        from core.domains import registry
+        target_domain = registry.get(target_domain_id) if target_domain_id != "auto" else None
+        if not target_domain:
+            target_domain = orchestrator.domain
+
         # ──── Resolve Provider ─────────────────────────────────────────
         is_live = provider_type and provider_type != "mock"
         if is_live:
@@ -110,11 +115,11 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 if hasattr(active_provider, 'interpret_with_retry'):
                     proposal, provider_name = active_provider.interpret_with_retry(
                         prompt=prompt,
-                        domain=orchestrator.domain,
+                        domain=target_domain,
                         validation_errors=last_validation_errors,
                     )
                 else:
-                    proposal = active_provider.interpret(prompt, orchestrator.domain)
+                    proposal = active_provider.interpret(prompt, target_domain)
                 t_interp_ms = (time.perf_counter() - t0) * 1000.0
 
                 trace.stage_trace.append(StageAttemptRecord(
@@ -130,7 +135,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
             except Exception as e:
                 t_interp_ms = (time.perf_counter() - t0) * 1000.0
                 # Fallback to mock
-                proposal = orchestrator.llm_provider.interpret(prompt, orchestrator.domain)
+                proposal = orchestrator.llm_provider.interpret(prompt, target_domain)
                 provider_name = "mock_fallback"
                 trace.stage_trace.append(StageAttemptRecord(
                     stage="INTERPRET",
@@ -144,7 +149,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
 
             # ─── Stage 2: Validation ──────────────────────────────────
             t1 = time.perf_counter()
-            val_res = orchestrator.validator.validate(proposal, orchestrator.domain)
+            val_res = orchestrator.validator.validate(proposal, target_domain)
             t_val_ms = (time.perf_counter() - t1) * 1000.0
 
             await emit("INTERPRETATION_COMPLETED",
@@ -174,7 +179,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 return
 
             # ─── Stage 3: Planning (with cascade) ─────────────────────
-            problem = orchestrator.validator.convert_to_problem(proposal, orchestrator.domain)
+            problem = orchestrator.validator.convert_to_problem(proposal, target_domain)
 
             # ─── Stage 2.5: Model B Complete Reachable-State Graph Enumeration
             if req.get("enumerate_graph", True):
@@ -189,7 +194,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                         max_edges=max_edges,
                         timeout_seconds=graph_timeout,
                     )
-                    graph = enumerator.enumerate_graph(problem, orchestrator.domain)
+                    graph = enumerator.enumerate_graph(problem, target_domain)
 
                     # Stream nodes in batches of 30 to avoid socket flooding
                     node_list = list(graph.nodes.values())
@@ -235,7 +240,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 t2 = time.perf_counter()
                 try:
                     planner = __import__('core.search.algorithms', fromlist=['get_planner_by_name']).get_planner_by_name(algo_name)
-                    plan_result = planner.search(problem, orchestrator.domain)
+                    plan_result = planner.search(problem, target_domain)
                     t_plan_ms = (time.perf_counter() - t2) * 1000.0
 
                     if plan_result.is_success:
@@ -310,7 +315,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
 
             # ─── Stage 4: Verification ────────────────────────────────
             t3 = time.perf_counter()
-            v_res = orchestrator.verifier.verify(problem, orchestrator.domain, candidate)
+            v_res = orchestrator.verifier.verify(problem, target_domain, candidate)
             t_verif_ms = (time.perf_counter() - t3) * 1000.0
 
             final_plan = candidate
@@ -350,7 +355,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 orchestrator.replanning_engine.planner = planner
                 replan_res = orchestrator.replanning_engine.run_repair_loop(
                     problem=problem,
-                    domain=orchestrator.domain,
+                    domain=target_domain,
                     initial_candidate=candidate,
                     natural_language_prompt=prompt,
                 )
