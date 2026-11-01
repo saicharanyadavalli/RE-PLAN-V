@@ -28,7 +28,9 @@ from core.contracts import (
     ReplanningResultSchema,
     StageAttemptRecord,
     TaskProposalSchema,
+    ValidationStatus,
     VerificationResultSchema,
+    ViolationType,
     WorldDeltaSchema,
 )
 from core.counterexamples.generator import CounterexampleGenerator
@@ -53,6 +55,8 @@ class PipelineExecutionResult(BaseModel):
     """Complete, end-to-end trace of a task through the RE-PLAN-V pipeline."""
     task_id: str
     raw_prompt: str
+    status: str = "COMPLETED"
+    domain_id: Optional[str] = None
     has_image: bool = False
     interpretation: TaskProposalSchema
     validation: ProposalValidationResult
@@ -68,6 +72,10 @@ class PipelineExecutionResult(BaseModel):
     final_verification: VerificationResultSchema
     total_execution_time_ms: float = 0.0
     decision_trace: Optional[PipelineDecisionTrace] = None
+
+    @property
+    def is_verified(self) -> bool:
+        return bool(self.final_verification and self.final_verification.is_valid)
 
 
 class PipelineOrchestrator:
@@ -98,7 +106,10 @@ class PipelineOrchestrator:
         if domain is not None:
             self.domain = domain
         elif domain_id is not None:
-            self.domain = registry.get(domain_id) or create_blocks_world_domain()
+            found = registry.get(domain_id)
+            if not found:
+                raise ValueError(f"Unregistered domain '{domain_id}'. Available domains: {[d.domain_id for d in registry.list_domains()]}")
+            self.domain = found
         else:
             self.domain = create_blocks_world_domain()
         self.llm_provider = llm_provider or MockLLMProvider()
@@ -135,20 +146,143 @@ class PipelineOrchestrator:
 
         # ──── Resolve Active Domain ─────────────────────────────────────
         active_domain = self.domain
+        routed_domain_id = getattr(self.domain, "domain_id", "blocks_world")
         if domain_id:
             from core.domains import registry
             if domain_id == "auto":
-                from interpretation.router import DomainRouter
+                from interpretation.router import DomainRouter, RoutingOutcome
                 router = DomainRouter(registry=registry)
                 routing = router.route(prompt)
-                if routing.selected_domain_id:
-                    matched = registry.get(routing.selected_domain_id)
-                    if matched:
-                        active_domain = matched
+
+                if routing.outcome != RoutingOutcome.SUPPORTED or not routing.selected_domain_id:
+                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                    status_name = routing.outcome.value if hasattr(routing.outcome, "value") else str(routing.outcome)
+                    explanation = routing.explanation or f"Task cannot proceed: routing outcome is {status_name}."
+                    return PipelineExecutionResult(
+                        task_id=f"rejected_{status_name.lower()}",
+                        raw_prompt=prompt,
+                        status=status_name,
+                        domain_id=None,
+                        interpretation=TaskProposalSchema(
+                            task_id=f"rejected_{status_name.lower()}",
+                            raw_prompt=prompt,
+                            entities={},
+                            initial_facts=[],
+                            goal_facts=[],
+                            confidence=0.0,
+                        ),
+                        validation=ProposalValidationResult(
+                            status=ValidationStatus.SCHEMA_ERROR,
+                            is_valid=False,
+                            errors=[explanation],
+                            warnings=[],
+                            validated_proposal=None,
+                        ),
+                        symbolic_problem_name="none",
+                        planner_algorithm=algorithm,
+                        candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=explanation),
+                        initial_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=explanation,
+                        ),
+                        final_plan=None,
+                        final_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=explanation,
+                        ),
+                        total_execution_time_ms=elapsed_ms,
+                        decision_trace=trace,
+                    )
+
+                matched = registry.get(routing.selected_domain_id)
+                if not matched:
+                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                    err = f"Routed domain '{routing.selected_domain_id}' not found in registry."
+                    return PipelineExecutionResult(
+                        task_id="rejected_unregistered_domain",
+                        raw_prompt=prompt,
+                        status="UNREGISTERED_DOMAIN",
+                        domain_id=routing.selected_domain_id,
+                        interpretation=TaskProposalSchema(
+                            task_id="rejected_unregistered_domain",
+                            raw_prompt=prompt,
+                            entities={},
+                            initial_facts=[],
+                            goal_facts=[],
+                            confidence=0.0,
+                        ),
+                        validation=ProposalValidationResult(
+                            status=ValidationStatus.SCHEMA_ERROR,
+                            is_valid=False,
+                            errors=[err],
+                            warnings=[],
+                            validated_proposal=None,
+                        ),
+                        symbolic_problem_name="none",
+                        planner_algorithm=algorithm,
+                        candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=err),
+                        initial_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=err,
+                        ),
+                        final_plan=None,
+                        final_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=err,
+                        ),
+                        total_execution_time_ms=elapsed_ms,
+                        decision_trace=trace,
+                    )
+                active_domain = matched
+                routed_domain_id = active_domain.domain_id
             else:
                 matched = registry.get(domain_id)
-                if matched:
-                    active_domain = matched
+                if not matched:
+                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                    err = f"Explicit domain '{domain_id}' is not registered."
+                    return PipelineExecutionResult(
+                        task_id="rejected_unknown_domain",
+                        raw_prompt=prompt,
+                        status="INVALID_DOMAIN",
+                        domain_id=domain_id,
+                        interpretation=TaskProposalSchema(
+                            task_id="rejected_unknown_domain",
+                            raw_prompt=prompt,
+                            entities={},
+                            initial_facts=[],
+                            goal_facts=[],
+                            confidence=0.0,
+                        ),
+                        validation=ProposalValidationResult(
+                            status=ValidationStatus.SCHEMA_ERROR,
+                            is_valid=False,
+                            errors=[err],
+                            warnings=[],
+                            validated_proposal=None,
+                        ),
+                        symbolic_problem_name="none",
+                        planner_algorithm=algorithm,
+                        candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=err),
+                        initial_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=err,
+                        ),
+                        final_plan=None,
+                        final_verification=VerificationResultSchema(
+                            is_valid=False,
+                            violation_type=ViolationType.NONE,
+                            explanation=err,
+                        ),
+                        total_execution_time_ms=elapsed_ms,
+                        decision_trace=trace,
+                    )
+                active_domain = matched
+                routed_domain_id = active_domain.domain_id
 
         # ──── Resolve LLM provider ─────────────────────────────────────
         import os
@@ -282,6 +416,8 @@ class PipelineOrchestrator:
                 return PipelineExecutionResult(
                     task_id=proposal.task_id,
                     raw_prompt=prompt,
+                    status="INVALID_PROPOSAL",
+                    domain_id=routed_domain_id,
                     has_image=(image is not None),
                     interpretation=proposal,
                     validation=val_res,
@@ -389,6 +525,8 @@ class PipelineOrchestrator:
                 return PipelineExecutionResult(
                     task_id=proposal.task_id,
                     raw_prompt=prompt,
+                    status="INVALID_PROPOSAL",
+                    domain_id=routed_domain_id,
                     has_image=(image is not None),
                     interpretation=proposal,
                     validation=val_res,
@@ -510,6 +648,8 @@ class PipelineOrchestrator:
             return PipelineExecutionResult(
                 task_id=proposal.task_id,
                 raw_prompt=prompt,
+                status="COMPLETED" if (final_verif and final_verif.is_valid) else "FAILED",
+                domain_id=routed_domain_id,
                 has_image=(image is not None),
                 interpretation=proposal,
                 validation=val_res,
@@ -542,6 +682,8 @@ class PipelineOrchestrator:
         return PipelineExecutionResult(
             task_id=fallback_proposal.task_id,
             raw_prompt=prompt,
+            status="FAILED",
+            domain_id=routed_domain_id,
             has_image=(image is not None),
             interpretation=fallback_proposal,
             validation=fallback_validation,

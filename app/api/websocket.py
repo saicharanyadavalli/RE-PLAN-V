@@ -56,10 +56,10 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
         })
 
         # ──── Domain Routing & Clarification Check ─────────────────────
+        from core.domains import registry
         target_domain_id = req.get("domain_id", "auto")
         if target_domain_id == "auto":
             from interpretation.router import DomainRouter, RoutingOutcome
-            from core.domains import registry
             router = DomainRouter(registry=registry)
             routing = router.route(prompt)
 
@@ -76,17 +76,30 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 })
                 return
 
-            if routing.selected_domain_id:
-                target_domain_id = routing.selected_domain_id
-                await emit("DOMAIN_SELECTED", f"Routed instruction to domain '{target_domain_id}' (confidence: {routing.domain_confidence:.2f}).", {
-                    "domain_id": target_domain_id,
-                    "confidence": routing.domain_confidence,
+            if routing.outcome == RoutingOutcome.INVALID_PROPOSAL:
+                await emit("TASK_INVALID", routing.explanation, {
+                    "explanation": routing.explanation,
                 })
+                return
 
-        from core.domains import registry
-        target_domain = registry.get(target_domain_id) if target_domain_id != "auto" else None
+            if routing.outcome != RoutingOutcome.SUPPORTED or not routing.selected_domain_id:
+                await emit("TASK_UNSUPPORTED", routing.explanation or "Prompt cannot be routed to a supported domain.", {
+                    "explanation": routing.explanation,
+                })
+                return
+
+            target_domain_id = routing.selected_domain_id
+            await emit("DOMAIN_SELECTED", f"Routed instruction to domain '{target_domain_id}' (confidence: {routing.domain_confidence:.2f}).", {
+                "domain_id": target_domain_id,
+                "confidence": routing.domain_confidence,
+            })
+
+        target_domain = registry.get(target_domain_id)
         if not target_domain:
-            target_domain = orchestrator.domain
+            await emit("ERROR", f"Requested domain '{target_domain_id}' is not registered.", {
+                "domain_id": target_domain_id,
+            })
+            return
 
         # ──── Resolve Provider ─────────────────────────────────────────
         is_live = provider_type and provider_type != "mock"

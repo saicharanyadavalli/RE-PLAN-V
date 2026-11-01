@@ -21,7 +21,7 @@ class MockLLMProvider(BaseLLMProvider):
             from interpretation.router import DomainRouter, RoutingOutcome
             router = DomainRouter()
             routing = router.route(prompt, explicit_domain_id=domain_id)
-            if routing.outcome == RoutingOutcome.SUPPORTED:
+            if routing.outcome == RoutingOutcome.SUPPORTED and routing.goal_facts:
                 return TaskProposalSchema(
                     task_id=f"mock_{domain_id}_task",
                     raw_prompt=prompt,
@@ -31,6 +31,16 @@ class MockLLMProvider(BaseLLMProvider):
                     negative_constraints=routing.negative_constraints,
                     confidence=routing.domain_confidence,
                 )
+            # Fail closed: never fall through to blocks world patterns
+            return TaskProposalSchema(
+                task_id=f"mock_{domain_id}_unsupported",
+                raw_prompt=prompt,
+                entities={},
+                initial_facts=[],
+                goal_facts=[],
+                negative_constraints=[],
+                confidence=0.0,
+            )
 
         # 1. 4-Block Tower Assembly
         if "4-block" in prompt_lower or ("yellow" in prompt_lower and "green" in prompt_lower and "blue" in prompt_lower and "red" in prompt_lower):
@@ -416,24 +426,14 @@ class MockLLMProvider(BaseLLMProvider):
                 confidence=routing.domain_confidence,
             )
 
-        # Default fallback proposal
-        entities = {"b1": "block", "b2": "block"}
-        initial_facts = [
-            FactSchema(predicate="on_table", arguments=("b1",)),
-            FactSchema(predicate="clear", arguments=("b1",)),
-            FactSchema(predicate="on_table", arguments=("b2",)),
-            FactSchema(predicate="clear", arguments=("b2",)),
-            FactSchema(predicate="handempty", arguments=()),
-        ]
-        goal_facts = [FactSchema(predicate="on", arguments=("b1", "b2"))]
-
+        # Fail closed on unrecognized / unsupported prompts (do not fabricate blocks)
         return TaskProposalSchema(
-            task_id="mock_fallback_task",
+            task_id="mock_unsupported_task",
             raw_prompt=prompt,
-            entities=entities,
-            initial_facts=initial_facts,
-            goal_facts=goal_facts,
+            entities={},
+            initial_facts=[],
+            goal_facts=[],
             negative_constraints=[],
-            confidence=0.80,
+            confidence=0.0,
         )
 

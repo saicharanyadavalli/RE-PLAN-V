@@ -32,6 +32,9 @@ class BenchmarkRequest(BaseModel):
 
 @router.post("/pipeline/run", response_model=PipelineExecutionResult)
 def run_pipeline(req: PipelineRequest) -> PipelineExecutionResult:
+    from core.domains import registry
+    if req.domain_id and req.domain_id != "auto" and not registry.get(req.domain_id):
+        raise HTTPException(status_code=404, detail=f"Domain '{req.domain_id}' is not registered.")
     try:
         result = orchestrator.run(
             prompt=req.prompt,
@@ -42,6 +45,8 @@ def run_pipeline(req: PipelineRequest) -> PipelineExecutionResult:
             domain_id=req.domain_id,
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -188,10 +193,10 @@ def test_formalize(req: FormalizeRequest) -> Dict[str, Any]:
     from interpretation.llm.live import LiveLLMProvider
     from core.domains import registry
 
-    target_domain = registry.get(req.domain_id or "blocks_world")
+    target_domain_id = req.domain_id or "blocks_world"
+    target_domain = registry.get(target_domain_id)
     if not target_domain:
-        from core.actions.domain import create_blocks_world_domain
-        target_domain = create_blocks_world_domain()
+        raise HTTPException(status_code=404, detail=f"Domain '{target_domain_id}' is not registered.")
 
     provider = LiveLLMProvider(
         provider=req.provider,
