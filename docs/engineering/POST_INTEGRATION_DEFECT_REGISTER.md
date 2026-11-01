@@ -1,7 +1,7 @@
 # RE-PLAN-V: Post-Integration Defect Register (Final Closeout)
 
 - **Audit Date**: November 2026
-- **Audited Commit**: `4e908f4d8ec12981720e08cbff2d81c3986d03e2` (Baseline) -> `2b0db2b` (Final Main)
+- **Audited Commit**: `4e908f4d8ec12981720e08cbff2d81c3986d03e2` (Baseline) -> `7a40579` (Stage 11 Verified Main)
 - **Classification Taxonomy**: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
 - **Status Taxonomy**: `VERIFIED_CLOSED` (All 11 Defects Remediated & Verified)
 

@@ -30,7 +30,7 @@ RE-PLAN-V has completed its comprehensive single-main-branch staged hardening, s
   12. `1925124` — *Stage 10.5 - 10.7*: Dual field graph transport contract (`id`/`node_id`, `is_truncated_boundary`), domain-aware state inspector, dynamic attribution confusion matrix endpoint, and signed advantage (DEF-10.5, DEF-10.6, DEF-10.7).
   13. `4937466` — *Stage 10.8*: Research methodology correction: B0/B1 repair rate `None` / `N/A` with zero invalid cases, empirical ground truth attribution check, and empirical lower bound labeling (DEF-10.8, DEF-10.9, DEF-10.10).
   14. `dd411ce` — *Stage 10.9*: Strict 422 boundary validation (`ge=1`, `gt=0.0`) and prompt injection containment defenses (DEF-10.11).
-  15. *Stage 11*: Typed action constraints, unified problem builder, graph budget ceilings/concurrency, pure isolated repair timer, security sandbox boundaries, A* weighted cost oracle, REST/WS parity, benchmark UI provenance (ST11-01 through ST11-08).
+  15. `7a40579` — *Stage 11*: Typed action constraints, unified problem builder, graph budget ceilings/concurrency, pure isolated repair timer, security sandbox boundaries, A* weighted cost oracle, REST/WS parity, benchmark UI provenance (ST11-01 through ST11-08).
 
 ---
 
