@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from core.actions.definition import ActionDefinition, ActionParameter
 from core.domains.base import BaseDomain
+from core.world.constraints import FunctionalDependencyInvariant
 from core.world.predicates import Fact, PredicateDefinition
 from core.world.types import TypeHierarchy
 
@@ -201,7 +202,7 @@ class HouseholdRoboticsDomain(BaseDomain):
             type_hierarchy=th,
             predicates=preds,
             actions=[navigate, open_c, close_c, pick_surface, place_surface, pick_container, place_container],
-            default_invariants=[],
+            default_invariants=[FunctionalDependencyInvariant("robot_at", 0, 1), FunctionalDependencyInvariant("item_on", 0, 1)],
             task_examples=examples,
             supported_patterns=[
                 "room", "kitchen", "living room", "bedroom", "mug", "cabinet", "shelf", "counter", "drawer", "robot", "cup"

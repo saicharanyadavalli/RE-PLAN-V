@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from core.actions.definition import ActionDefinition, ActionParameter
 from core.domains.base import BaseDomain
+from core.world.constraints import FunctionalDependencyInvariant
 from core.world.predicates import Fact, PredicateDefinition
 from core.world.types import TypeHierarchy
 
@@ -99,7 +100,7 @@ class SchedulingDomain(BaseDomain):
             type_hierarchy=th,
             predicates=preds,
             actions=[schedule_independent, schedule_dependent],
-            default_invariants=[],
+            default_invariants=[FunctionalDependencyInvariant("job_assigned", 0, 1)],
             task_examples=examples,
             supported_patterns=[
                 "schedule", "allocate", "machine", "job", "slot", "resource", "precedence", "task", "timeline"

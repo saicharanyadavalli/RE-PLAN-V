@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from core.actions.definition import ActionDefinition, ActionParameter
 from core.domains.base import BaseDomain
+from core.world.constraints import FunctionalDependencyInvariant
 from core.world.predicates import Fact, PredicateDefinition
 from core.world.types import TypeHierarchy
 
@@ -123,7 +124,7 @@ class BlocksWorldDomain(BaseDomain):
             type_hierarchy=th,
             predicates=preds,
             actions=[pick_up, put_down, stack, unstack],
-            default_invariants=[],
+            default_invariants=[FunctionalDependencyInvariant("on", 0, 1)],
             task_examples=examples,
             supported_patterns=[
                 "stack", "unstack", "pick up", "put down", "tower", "clear", "table", "block", "box", "boxes", "glass"
