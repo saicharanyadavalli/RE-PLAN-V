@@ -5,7 +5,7 @@
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.1%20App%20Router-black.svg)](frontend/)
 [![WebSocket](https://img.shields.io/badge/Streaming-Bidirectional%20WebSockets-teal.svg)](app/api/websocket.py)
-[![Tests](https://img.shields.io/badge/Tests-393%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-432%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Symbolic Core](https://img.shields.io/badge/Core-Symbolic--First%20Authoritative-success.svg)](core/)
 [![Zero-API Ready](https://img.shields.io/badge/Zero--API-100%25%20Offline%20Ready-emerald.svg)](core/)
 
@@ -52,14 +52,14 @@ When defending this project in academic viva examinations (CS F407 / U407), the 
 
 | Subsystem | Academic Pillar | Custom Student Implementation | Codebase Path |
 | :--- | :--- | :--- | :--- |
-| **First-Order Logic Core** | KR&R | Robinson's MGU Unification, term substitution, occurs-check, Horn clause forward chaining | [`core/krr/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/krr/) |
-| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search, BFS, Best-First Search with provably admissible Relaxed Planning Graph (RPG) $h_{\max}$ heuristic | [`core/search/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/search/) |
-| **STRIPS Formal Verifier** | Formal Methods | Independent state transition checker, invariant validation, mutex detection, goal checking | [`core/verification/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/verification/) |
-| **Counterexample Generator** | Formal Diagnostics | Minimal failing sub-trace extraction, state projection, actionable witness creation | [`core/counterexamples/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/counterexamples/) |
-| **Fault Attribution Engine** | Diagnostic AI | 5-class evidence-based taxonomy (`PERCEPTION`, `FORMALIZATION`, `PLANNING`, `ENVIRONMENT`, `AMBIGUOUS`) | [`core/attribution/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/attribution/) |
-| **Symbolic Repair Engine** | Inductive Synthesis (CEGIS) | Synthesis of negative pruning constraints (`FORBID_ACTION_IN_STATE`, `FORBID_GROUND_ACTION`) into search space | [`core/repair/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/core/repair/) |
-| **Mission Control Dashboard** | Full-Stack Systems | Next.js 15+ App Router, Tailwind CSS, HTML5 Canvas animation, real-time WebSocket lifecycle streaming | [`frontend/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/frontend/) |
-| **Neural Task Translator** | Deep Learning Interface | Optional Pydantic prompt formatter for Gemma 2 2B / Gemini / Zero-API offline mock | [`interpretation/`](file:///C:/Users/yadav/Desktop/learning/RE-PLAN-V/interpretation/) |
+| **First-Order Logic Core** | KR&R | Robinson's MGU Unification, term substitution, occurs-check, Horn clause forward chaining | [`core/krr/`](core/krr/) |
+| **Optimal Search Engine** | Search & Heuristics | $A^*$ Search, BFS, Best-First Search with provably admissible heuristic ($h \equiv 0$ uniform-cost baseline guaranteeing optimality, and RPG $h_{\max}$ heuristic) | [`core/search/`](core/search/) |
+| **STRIPS Formal Verifier** | Formal Methods | Independent state transition checker, invariant validation, mutex detection, goal checking | [`core/verification/`](core/verification/) |
+| **Counterexample Generator** | Formal Diagnostics | Minimal failing sub-trace extraction, state projection, actionable witness creation | [`core/counterexamples/`](core/counterexamples/) |
+| **Fault Attribution Engine** | Diagnostic AI | 5-class evidence-based taxonomy (`PERCEPTION`, `FORMALIZATION`, `PLANNING`, `ENVIRONMENT`, `AMBIGUOUS`) | [`core/attribution/`](core/attribution/) |
+| **Symbolic Repair Engine** | Inductive Synthesis (CEGIS) | Synthesis of negative pruning constraints (`FORBID_ACTION_IN_STATE`, `FORBID_GROUND_ACTION`) into search space | [`core/repair/`](core/repair/) |
+| **Mission Control Dashboard** | Full-Stack Systems | Next.js 15+ App Router, Tailwind CSS, HTML5 Canvas animation, real-time WebSocket lifecycle streaming | [`frontend/`](frontend/) |
+| **Neural Task Translator** | Deep Learning Interface | Optional Pydantic prompt formatter for Gemma 2 2B / Gemini / Zero-API offline mock | [`interpretation/`](interpretation/) |
 
 ---
 
@@ -115,7 +115,7 @@ The project features a full Next.js 15+ dark-mode Mission Control dashboard (`fr
 A central innovation of RE-PLAN-V is proving that **massive 70B cloud models are not required for reliable robotics**:
 
 1. **Lightweight & Edge-Deployable:** A 2-billion parameter model (e.g., Google Gemma 2 2B or Qwen 2.5 1.5B) requires only **~1.8 GB of VRAM** (or 4-bit quantized ~1.2 GB), allowing it to run smoothly on edge robotic hardware or modest laptops.
-2. **Speed & Efficiency:** Inference latency is **< 100 ms**, compared to 1–3 seconds for cloud APIs.
+2. **Speed & Efficiency:** Inference latency is **~100–350 ms** on consumer GPU (e.g. RTX 4060) or local CPU fallback, compared to 1–3 seconds for cloud APIs.
 3. **Formal Verification Safety Net:** Because the LLM's role is strictly confined to grammar translation, any potential hallucination is caught and rejected by our STRIPS verifier.
 4. **Formally Verified Plan Correctness:** Pairing an efficient 2B model with RE-PLAN-V's authoritative symbolic verifier delivers **formally verified symbolic plans under declared domain invariants**, catching any neural hallucination at zero API cost.
 
@@ -212,7 +212,7 @@ python -m app.main --mode benchmark --instances 5 --seed 42
 # Execute full pytest suite with coverage
 pytest --cov=core --cov=interpretation --cov=evaluation --cov=dynamic --cov=app --cov-report=term-missing
 ```
-*Result:* **181 passing tests**, **87%+ overall coverage**, 100% test pass rate.
+*Result:* **432 passing tests**, **87%+ overall coverage**, 100% test pass rate.
 
 ---
 
@@ -237,11 +237,13 @@ Measured empirical results across $N=10$ benchmark problem instances from `evalu
 
 | Baseline / Method | Mathematical Formulation | Valid Plan Rate | Goal Success | Fault Recovery Rate | Avg Search / Repair Time |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **B0: Direct Neural** | Raw unverified LLM token proposal | 0.0% | 0.0% | 0.0% | 0.09 ms |
-| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 100.0% | 100.0% | 100.0%* | 16.28 ms |
-| **B2: Verifier Reject-Only** | Formal verifier reject-only (no repair) | 0.0% | 0.0% | 0.0% | 0.07 ms |
-| **B3: Generic Regeneration** | Unguided candidate plan re-sampling | 50.0% | 50.0% | 50.0% | 10.37 ms |
-| **OURS: RE-PLAN-V** | **Counterexample-guided pruning repair** | **100.0%** | **100.0%** | **100.0%** | **18.42 ms** |
+| **B0: Direct Neural** | Raw unverified LLM token proposal | 0.0% | 0.0% | N/A | 0.14 ms |
+| **B1: Formalized Planner** | Formalized task + classical $A^*$ search | 100.0% | 100.0% | N/A* | 84.20 ms |
+| **B2: Verifier Reject-Only** | Formal verifier reject-only (no repair) | 0.0% | 0.0% | 0.0% | 0.12 ms |
+| **B3: Generic Regeneration** | Unguided candidate plan re-sampling | 50.0% | 50.0% | 50.0% | 16.41 ms |
+| **OURS: RE-PLAN-V** | **Counterexample-guided pruning repair** | **100.0%** | **100.0%** | **100.0%** | **93.13 ms** |
+
+\* *N/A: B0 and B1 are evaluated on initial proposals without prior invalid candidate plans fed to a repair loop (denominator is 0).*
 
 **Measured Recovery Advantage (OURS vs B3 Generic Regeneration): +50.0%**
 
@@ -267,10 +269,10 @@ Calibrated across all 6 STRIPS domains using authoritative Model B state-space e
 | **Household Robotics** | TINY / MEDIUM / LARGE | 6 / 48 / 375 | 6 / 45 / 336 | 10 / 96 / 832 | Complete |
 | **Warehouse Logistics** | TINY / MEDIUM / LARGE | 6 / 75 / 648 | 8 / 90 / 636 | 13 / 192 / 1517 | Complete |
 | **Job Scheduling** | TINY / MEDIUM / LARGE | 3 / 25 / 125 | 7 / 73 / 209 | 10 / 192 / 628 | Complete |
-| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated at Edge Cap |
+| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated at Edge Cap (Lower Bound) |
 
 > [!NOTE]
-> Analytical bounds represent theoretical combinatorial state spaces. Measured values represent empirical Model B reachability graphs enumerated via forward BFS search under domain transition semantics.
+> Analytical bounds represent theoretical combinatorial state spaces. Measured values represent empirical Model B reachability graphs enumerated via forward BFS search under domain transition semantics. Truncated state spaces are empirical lower bounds resulting from budget limits.
 
 > [!IMPORTANT]
 > **Model-Relative Safety Notice**: All verification guarantees in RE-PLAN-V are strictly model-relative against the declared STRIPS domain models, typed schemas, and formal invariants. RE-PLAN-V is an algorithmic and neuro-symbolic research platform; it does not issue live motor commands or guarantee physical hardware safety.
@@ -281,7 +283,7 @@ Calibrated across all 6 STRIPS domains using authoritative Model B state-space e
 
 This project satisfies all requirements of **CS F407 / U407 Artificial Intelligence (Appendix B: Cross-Area Project)**:
 
-1. **Search & Heuristics:** Implementation of $A^*$ search with an admissible heuristic derived from Relaxed Planning Graphs ($h_{\max}$).
+1. **Search & Heuristics:** Implementation of $A^*$ search with an admissible heuristic guaranteeing step-cost optimality ($h \equiv 0$ uniform-cost search baseline and Relaxed Planning Graph $h_{\max}$ heuristic).
 2. **Knowledge Representation & Reasoning:** First-Order Logic terms, Robinson's MGU Unification with occurs-check, and Horn clause forward chaining.
 3. **Classical Planning:** Formal STRIPS operator definitions, precondition matching, state transition semantics, and invariant enforcement.
 4. **Deep Learning / Neural Systems:** LLM integration as a bounded, untrusted proposer supporting both local 2B models (Gemma 2 2B / Qwen 2.5) and cloud endpoints.

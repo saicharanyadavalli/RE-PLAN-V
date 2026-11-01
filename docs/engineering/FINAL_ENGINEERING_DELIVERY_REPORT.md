@@ -24,7 +24,12 @@ RE-PLAN-V has completed its comprehensive single-main-branch staged hardening, s
   6. `de32d7b` — *Stage 6*: Frontend Mission Control hardening, dynamic API URL utilities (`frontend/utils/api.ts`), reverse-proxy resilience (DEF-10), and Next.js production build verification.
   7. `94f5a18` — *Stage 7*: Research methodology hardening, signed recovery advantage calculation (DEF-02), post-hoc ablation verification (DEF-03), multi-domain complexity tiers spanning 100–3000+ states (DEF-08), and 5-class fault attribution ambiguity arbitration (DEF-09).
   8. `2b0db2b` — *Stage 8*: Multi-domain end-to-end integration, graph resource limits (node caps, edge caps, timeouts), prompt injection resistance, and model-relative safety assertions.
-  9. Final Stage 9 delivery commit.
+  9. `2b52b20` — *Stage 10.1*: Fail-closed pipeline and routing across unsupported domains, invalid proposals, and clarification states (DEF-10.1).
+  10. `747e8b9` — *Stage 10.2 & 10.3*: Exact negative constraint semantics (`ForbidActionConstraint`, `ForbidActionBindingConstraint`) and domain default invariants with type-hierarchy enforcement (DEF-10.2, DEF-10.3).
+  11. `584b49c` — *Stage 10.4*: Admissible optimal A* search heuristic configuration (`ZeroHeuristic`) and optimality metadata tracking (DEF-10.4).
+  12. `1925124` — *Stage 10.5 - 10.7*: Dual field graph transport contract (`id`/`node_id`, `is_truncated_boundary`), domain-aware state inspector, dynamic attribution confusion matrix endpoint, and signed advantage (DEF-10.5, DEF-10.6, DEF-10.7).
+  13. `4937466` — *Stage 10.8*: Research methodology correction: B0/B1 repair rate `None` / `N/A` with zero invalid cases, empirical ground truth attribution check, and empirical lower bound labeling (DEF-10.8, DEF-10.9, DEF-10.10).
+  14. `dd411ce` — *Stage 10.9*: Strict 422 boundary validation (`ge=1`, `gt=0.0`) and prompt injection containment defenses (DEF-10.11).
 
 ---
 
@@ -67,18 +72,37 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 | **DEF-10** | `LOW` | `frontend/components/StateSpaceExplorer.tsx` | Replaced hardcoded `:8080` URLs with centralized dynamic helper `frontend/utils/api.ts` supporting standard and reverse-proxy ports. | Next.js production build (`npm run build`) clean with dynamic routing. | **VERIFIED_CLOSED** |
 | **DEF-11** | `LOW` | `core/world/predicates.py` | Unified predicate representation with bijective translation methods `Fact.to_schema()` and `Fact.from_schema()`. | `tests/unit/test_contracts.py` and `test_domain_conformance.py`. | **VERIFIED_CLOSED** |
 
+### 3.1 Stage 10 Remaining Defect Closeout (DEF-10.1 through DEF-10.11)
+
+| Defect ID | Severity | File Path | Remediation Summary | Verification Test Evidence | Final Status |
+|:---|:---|:---|:---|:---|:---|
+| **DEF-10.1** | `CRITICAL` | `app/services/pipeline.py`, `app/api/websocket.py` | Pipeline & WebSocket fallbacks fail closed on unsupported / invalid routing. | `tests/integration/test_stage_10_fail_closed_pipeline.py` (11 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.2** | `CRITICAL` | `core/world/constraints.py` | Fixed `ProhibitedEntityActionConstraint` and added `ForbidActionConstraint` & `ForbidActionBindingConstraint`. | `tests/unit/test_stage_10_negative_constraint_semantics.py` (5 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.3** | `HIGH` | `interpretation/validator/validator.py` | Enforced `domain.default_invariants` and predicate `arg_types` subtyping in validator. | `tests/integration/test_stage_10_domain_invariants_pipeline.py` (4 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.4** | `HIGH` | `core/search/algorithms.py` | Configured `ZeroHeuristic()` (uniform-cost search) as admissible default, reporting `is_optimal`. | `tests/unit/test_stage_10_astar_optimality.py` (3 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.5** | `HIGH` | `core/graph/models.py`, `frontend/types/pipeline.ts` | Provided dual fields (`id`/`node_id`, `is_boundary`/`is_truncated_boundary`, `max_depth`/`max_depth_reached`). | `tests/integration/test_stage_10_graph_transport_contract.py` (3 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.6** | `MEDIUM` | `frontend/components/StateSpaceExplorer.tsx` | Removed synthetic `120ms` fallback and created `SymbolicStateInspector.tsx` for non-blocks domains. | Next.js production build (`npm run build`). | **VERIFIED_CLOSED** |
+| **DEF-10.7** | `MEDIUM` | `frontend/components/BenchmarkTab.tsx`, `app/api/routes.py` | Added `/api/benchmark/attribution` endpoint and wired dynamic confusion matrix and signed advantage. | Next.js production build and API tests. | **VERIFIED_CLOSED** |
+| **DEF-10.8** | `HIGH` | `evaluation/metrics/collector.py`, `core/contracts.py` | Corrected denominator for repair rate: reports `None` (`"N/A"`) when 0 invalid candidate plans exist. | `test_stage_10_evaluation_metrics_denominators.py` (4 passed). | **VERIFIED_CLOSED** |
+| **DEF-10.9** | `HIGH` | `evaluation/experiments/runner.py` | Evaluated `attribution_correct` against ground truth `PLANNING_ERROR` from `r_ours["attribution"]`. | Research benchmark reproduction suite. | **VERIFIED_CLOSED** |
+| **DEF-10.10** | `MEDIUM` | `scripts/reproduce_results.py`, `README.md` | Labeled truncated Model B graphs with explicit `(empirical lower bound, edge-capped)`. | Benchmark table output and documentation. | **VERIFIED_CLOSED** |
+| **DEF-10.11** | `MEDIUM` | `app/api/routes.py` | Added strict `ge=1` and `gt=0.0` Pydantic bounds (returning HTTP 422) and prompt injection containment. | `tests/unit/test_stage_10_security_resource_bounds.py` (6 passed). | **VERIFIED_CLOSED** |
+
 ---
 
 ## 4. Comprehensive Empirical & Verification Evidence
 
 ### 4.1 Backend Test Suite Execution
 - **Command**: `pytest`
-- **Result**: **393 passed**, 2 warnings in 18.87s
+- **Result**: **432 passed**, 2 warnings in 20.47s
 - **Breakdown**:
   - `tests/edge_cases/test_edge_cases.py`: 16 passed
   - `tests/integration/test_multi_domain_pipeline.py`: 5 passed
   - `tests/integration/test_pipeline_e2e.py`: 13 passed
   - `tests/integration/test_stage_8_reliability.py`: 17 passed
+  - `tests/integration/test_stage_10_domain_invariants_pipeline.py`: 4 passed
+  - `tests/integration/test_stage_10_fail_closed_pipeline.py`: 11 passed
+  - `tests/integration/test_stage_10_graph_transport_contract.py`: 3 passed
   - `tests/integration/test_websocket_streaming.py`: 6 passed
   - `tests/property/test_properties.py`: 11 passed
   - `tests/scenarios/test_failure_scenarios.py`: 12 passed
@@ -99,10 +123,14 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - `tests/unit/test_krr.py`: 6 passed
   - `tests/unit/test_lm_studio_provider.py`: 5 passed
   - `tests/unit/test_multi_domain_benchmarks.py`: 3 passed
-  - `tests/unit/test_nlp_corpus.py`: 145 passed
+  - `tests/unit/test_nlp_corpus.py`: 145 passed (146 natural language corpus cases evaluated across tests)
   - `tests/unit/test_repair.py`: 3 passed
   - `tests/unit/test_retry_tree.py`: 4 passed
   - `tests/unit/test_search.py`: 8 passed
+  - `tests/unit/test_stage_10_astar_optimality.py`: 3 passed
+  - `tests/unit/test_stage_10_evaluation_metrics_denominators.py`: 4 passed
+  - `tests/unit/test_stage_10_negative_constraint_semantics.py`: 5 passed
+  - `tests/unit/test_stage_10_security_resource_bounds.py`: 6 passed
   - `tests/unit/test_state_space_explorer.py`: 6 passed
   - `tests/unit/test_verification.py`: 7 passed
   - `tests/unit/test_vision.py`: 3 passed
@@ -119,8 +147,8 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
 - **Command**: `python scripts/reproduce_results.py --instances 10`
 - **Elapsed Time**: 4.06 seconds
 - **Primary Comparative Results**:
-  - `B0_DirectNeural`: 0.0% Valid Plan Rate, 0.0% Repair Rate
-  - `B1_FormalizedPlanner`: 100.0% Valid Plan Rate (baseline planner)
+  - `B0_DirectNeural`: 0.0% Valid Plan Rate, N/A Repair Rate
+  - `B1_FormalizedPlanner`: 100.0% Valid Plan Rate, N/A Repair Rate (0 initially invalid plans to repair; denominator is 0)
   - `B2_VerifierNoRepair`: 0.0% Repair Rate (rejects upon invalidity)
   - `B3_GenericRegeneration`: 50.0% Repair Rate (unguided sampling)
   - `OURS_CounterexampleRepair`: **100.0% Repair Rate**
@@ -142,7 +170,7 @@ Every defect cataloged in `docs/engineering/POST_INTEGRATION_DEFECT_REGISTER.md`
   - Household Robotics: 6 states (TINY), 45 states (MEDIUM), 336 states (LARGE)
   - Warehouse Logistics: 8 states (TINY), 90 states (MEDIUM), 636 states (LARGE)
   - Job Scheduling: 7 states (TINY), 73 states (MEDIUM), 209 states (LARGE)
-  - Software Workflow: 9 states (TINY), 16 states (SMALL), 1317 states (MEDIUM, edge-capped)
+  - Software Workflow: 9 states (TINY), 16 states (SMALL), 1317 states (MEDIUM, empirical lower bound, edge-capped)
 
 ---
 
