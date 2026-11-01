@@ -132,19 +132,33 @@ Evaluating the fault classifier on controlled benchmark suites with synthetic mu
 | Ablation Configuration | Description | Recovery Rate | Avg Iterations | Safety Invariant Violations |
 | :--- | :--- | :---: | :---: | :---: |
 | **Full RE-PLAN-V** | Complete pipeline | **100.0%** | **1.00** | **0.0%** |
-| **w/o Formal Verifier** | Blindly accept candidate plans | 100.0%* | 0.00 | 100.0% (Unsafe) |
-| **w/o Repair Engine** | Fail fast upon first rejection | 0.0% | 0.00 | 0.0% |
-| **w/o Counterexample Constraints** | Blind regeneration without pruning | 0.0% | 5.00 | 100.0% |
-| **w/o Fault Attribution** | Uniform constraint injection | 100.0% | 1.00 | 0.0% |
-| **Generic Regeneration (B3)** | Unguided candidate re-sampling | 50.0% | 3.20 | 50.0% |
+| **w/o Formal Verifier** | Candidate accepted without verifier (evaluated post-hoc) | **0.0%** | **0.00** | 100.0% (Unsafe) |
+| **w/o Repair Engine** | Fail fast upon first rejection | **0.0%** | 0.00 | 0.0% |
+| **w/o Counterexample Constraints** | Blind regeneration without pruning | **0.0%** | 5.00 | 100.0% |
+| **w/o Fault Attribution** | Fallback state-action pruning (planning errors only) | 100.0% | 1.00 | 0.0% |
+| **Generic Regeneration (B3)** | Unguided candidate re-sampling | **50.0%** | 3.20 | 50.0% |
+
+### 3.4 Multi-Domain Reachable State Space Complexity (Model B Measurement)
+
+State space analysis across all 6 domains comparing analytical bounds with empirical Model B reachability graphs:
+
+| Domain ID | Evaluated Tier | Analytical Bound | Measured Reachable States | Directed Action Edges | Completion Status |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Blocks World** | TINY / MEDIUM / LARGE | 3 / 73 / 501 | 5 / 125 / 866 | 8 / 272 / 2090 | Complete |
+| **Grid World** | TINY / MEDIUM / LARGE | 4 / 294 / 648 | 4 / 288 / 640 | 6 / 624 / 1376 | Complete |
+| **Household Robotics** | TINY / MEDIUM / LARGE | 6 / 48 / 375 | 6 / 45 / 336 | 10 / 96 / 832 | Complete |
+| **Warehouse Logistics** | TINY / MEDIUM / LARGE | 6 / 75 / 648 | 8 / 90 / 636 | 13 / 192 / 1517 | Complete |
+| **Job Scheduling** | TINY / MEDIUM / LARGE | 3 / 25 / 125 | 7 / 73 / 209 | 10 / 192 / 628 | Complete |
+| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated at Edge Cap |
 
 ---
 
 ## 4. Discussion & Limitations
 
 1. **Deterministic Completeness**: The classical search planners (A*, BFS) guarantee completeness and optimality within the grounded symbolic problem.
-2. **Attribution Reliability**: The rule-based attribution classifier provides transparent, auditable explanations. If contradictory evidence arises, it gracefully defaults to `UNKNOWN_AMBIGUOUS` rather than hallucinating a false cause.
-3. **Scalability Considerations**: While sub-millisecond on 3-10 objects, grounded STRIPS search exhibits exponential complexity with object count ($O(b^d)$). Future extensions will incorporate lifted planning and hierarchical task networks (HTN).
+2. **Attribution Reliability**: The evidence-guided attribution classifier provides transparent, auditable explanations. If contradictory evidence arises, it gracefully defaults to `UNKNOWN_AMBIGUOUS` rather than hallucinating a false cause.
+3. **Model-Relative Safety**: All formal verification and repair guarantees are strictly relative to the declared STRIPS domain models and invariants. The framework does not guarantee physical hardware safety or bypass sandbox boundaries.
+4. **Scalability Considerations**: While sub-millisecond on 3-10 objects, grounded STRIPS search exhibits exponential complexity with object count ($O(b^d)$). Future extensions will incorporate lifted planning and hierarchical task networks (HTN).
 
 ---
 

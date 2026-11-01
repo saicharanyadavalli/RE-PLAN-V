@@ -5,7 +5,7 @@
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15.1%20App%20Router-black.svg)](frontend/)
 [![WebSocket](https://img.shields.io/badge/Streaming-Bidirectional%20WebSockets-teal.svg)](app/api/websocket.py)
-[![Tests](https://img.shields.io/badge/Tests-181%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-393%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Symbolic Core](https://img.shields.io/badge/Core-Symbolic--First%20Authoritative-success.svg)](core/)
 [![Zero-API Ready](https://img.shields.io/badge/Zero--API-100%25%20Offline%20Ready-emerald.svg)](core/)
 
@@ -250,11 +250,30 @@ Measured empirical results across $N=10$ benchmark problem instances from `evalu
 | Ablation Configuration | Instances | Repair Success Rate | Avg Iterations | Key Insight |
 | :--- | :---: | :---: | :---: | :--- |
 | **Full System (OURS)** | 10 | **100.0%** | **1.00** | Structured witness prunes failing state-action transition |
-| **Without Verifier** | 10 | 100.0%* | 0.00 | *Blind trust without verification (unsafe in reality) |
+| **Without Verifier** | 10 | **0.0%** | **0.00** | Post-hoc ground-truth verification confirms candidate fails execution without gate |
 | **Without Counterexample** | 10 | **0.0%** | 5.00 | Reaches max iterations without finding targeted repair |
-| **Without Attribution** | 10 | 100.0% | 1.00 | Heuristic constraint pruning still works for simple failures |
-| **Without Repair** | 10 | **0.0%** | 0.00 | Verifier rejects immediately, cannot recover |
+| **Without Attribution** | 10 | 100.0% | 1.00 | Heuristic pruning handles planning errors, but cannot correct state belief or omissions |
+| **Without Repair** | 10 | **0.0%** | **0.00** | Verifier rejects immediately; no recovery attempted |
 | **Generic Regeneration (B3)** | 10 | **50.0%** | 3.20 | Unguided sampling struggles with multi-block obstacles |
+
+### Multi-Domain State Space Complexity Coverage (Model B Empirical Measurement)
+
+Calibrated across all 6 STRIPS domains using authoritative Model B state-space enumeration:
+
+| Domain ID | Supported Tier | Analytical Bound | Measured Reachable States | Directed Transitions | Status |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Blocks World** | TINY / MEDIUM / LARGE | 3 / 73 / 501 | 5 / 125 / 866 | 8 / 272 / 2090 | Complete |
+| **Grid World** | TINY / MEDIUM / LARGE | 4 / 294 / 648 | 4 / 288 / 640 | 6 / 624 / 1376 | Complete |
+| **Household Robotics** | TINY / MEDIUM / LARGE | 6 / 48 / 375 | 6 / 45 / 336 | 10 / 96 / 832 | Complete |
+| **Warehouse Logistics** | TINY / MEDIUM / LARGE | 6 / 75 / 648 | 8 / 90 / 636 | 13 / 192 / 1517 | Complete |
+| **Job Scheduling** | TINY / MEDIUM / LARGE | 3 / 25 / 125 | 7 / 73 / 209 | 10 / 192 / 628 | Complete |
+| **Software Workflow** | TINY / SMALL / MEDIUM | 4 / 6 / 36 | 9 / 16 / 1317 | 32 / 78 / 14000 | Truncated at Edge Cap |
+
+> [!NOTE]
+> Analytical bounds represent theoretical combinatorial state spaces. Measured values represent empirical Model B reachability graphs enumerated via forward BFS search under domain transition semantics.
+
+> [!IMPORTANT]
+> **Model-Relative Safety Notice**: All verification guarantees in RE-PLAN-V are strictly model-relative against the declared STRIPS domain models, typed schemas, and formal invariants. RE-PLAN-V is an algorithmic and neuro-symbolic research platform; it does not issue live motor commands or guarantee physical hardware safety.
 
 ---
 
