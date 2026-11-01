@@ -1,83 +1,117 @@
 "use client";
 
-import React, { useState } from "react";
-import { Play, Sparkles, AlertTriangle, Layers, Wand2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Play, Sparkles, AlertTriangle, Layers, Wand2, Compass, Network } from "lucide-react";
 import { PipelineRunRequest } from "../types/pipeline";
 
 interface TaskControlPanelProps {
   onRun: (req: PipelineRunRequest) => void;
   isStreaming: boolean;
   onPromptChange?: (prompt: string) => void;
+  externalPrompt?: string;
+  externalDomainId?: string;
 }
 
 const PRESETS = [
   {
     id: 1,
-    title: "1. Safe Relocation (DoD)",
+    domain: "blocks_world",
+    domainLabel: "Blocks",
+    title: "Safe Relocation",
     prompt: "Move the red box next to the blue box. Do not move the glass.",
     forceFault: false,
-    tag: "Safety Constraint",
   },
   {
     id: 2,
-    title: "2. 3-Block Tower",
+    domain: "blocks_world",
+    domainLabel: "Blocks",
+    title: "Stack 3 Blocks",
     prompt: "Stack the red box on the green box, then put the blue box on the red box.",
     forceFault: false,
-    tag: "Multi-tier",
   },
   {
     id: 3,
-    title: "3. Tower Inversion",
-    prompt: "The red box is on the green box. Unstack the red box, place it on the table, and stack the green box on the red box.",
-    forceFault: false,
-    tag: "Deconstruction",
+    domain: "blocks_world",
+    domainLabel: "Blocks",
+    title: "Fragile Fault Injection",
+    prompt: "Stack the blue box on the green box. Do not touch the fragile glass.",
+    forceFault: true,
   },
   {
     id: 4,
-    title: "4. 4-Block Assembly",
-    prompt: "Build a 4-block tower: yellow box on green box, green box on blue box, and blue box on red box.",
+    domain: "grid_world",
+    domainLabel: "Grid",
+    title: "Grid 2D Key Transfer",
+    prompt: "Move robot from loc_0_0 to loc_2_2 and pick key_1.",
     forceFault: false,
-    tag: "Deep Search",
   },
   {
     id: 5,
-    title: "5. Clear Obstacle",
-    prompt: "Clear the obstacle blocking the target position before placing the blue box on the green box.",
+    domain: "household",
+    domainLabel: "House",
+    title: "Household Mug Retrieval",
+    prompt: "Navigate to kitchen, open cabinet, and pick mug.",
     forceFault: false,
-    tag: "Prerequisite",
   },
   {
     id: 6,
-    title: "6. Fragile Object Violation",
-    prompt: "Stack the blue box on the green box. Do not touch the fragile glass.",
-    forceFault: true,
-    tag: "Fault Injection",
+    domain: "warehouse",
+    domainLabel: "Logistics",
+    title: "AGV Inventory Transit",
+    prompt: "Transit agv_1 to shelf_b and retrieve sku_02.",
+    forceFault: false,
   },
   {
     id: 7,
-    title: "7. Single-Arm Capacity",
-    prompt: "Pick up the red box while keeping workspace clear and respecting single-arm capacity.",
+    domain: "scheduling",
+    domainLabel: "Schedule",
+    title: "Dual Machine Dispatch",
+    prompt: "Schedule job_a on m1 and job_b on m2.",
     forceFault: false,
-    tag: "Capacity Mutex",
   },
   {
     id: 8,
-    title: "8. Deadlock Conflict",
-    prompt: "Put the red box on the green box and the green box on the red box simultaneously.",
+    domain: "software_workflow",
+    domainLabel: "CI/CD",
+    title: "Gated Release Pipeline",
+    prompt: "Run unit tests, run security scan, build artifact, and deploy to staging.",
     forceFault: false,
-    tag: "Deadlock Detection",
   },
 ];
 
-export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskControlPanelProps) {
+export function TaskControlPanel({
+  onRun,
+  isStreaming,
+  onPromptChange,
+  externalPrompt,
+  externalDomainId,
+}: TaskControlPanelProps) {
   const [prompt, setPrompt] = useState(PRESETS[0].prompt);
+  const [domainId, setDomainId] = useState<string>("auto");
   const [algorithm, setAlgorithm] = useState("A*");
   const [forceFault, setForceFault] = useState(false);
+  const [enumerateGraph, setEnumerateGraph] = useState(true);
+  const [maxNodes, setMaxNodes] = useState(150);
   const [providerType, setProviderType] = useState("mock");
   const [llmModel, setLlmModel] = useState("gemma2:2b");
 
+  // Synchronize external prompt if changed from DomainStudio
+  useEffect(() => {
+    if (externalPrompt) {
+      setPrompt(externalPrompt);
+      onPromptChange?.(externalPrompt);
+    }
+  }, [externalPrompt, onPromptChange]);
+
+  useEffect(() => {
+    if (externalDomainId) {
+      setDomainId(externalDomainId);
+    }
+  }, [externalDomainId]);
+
   const handleSelectPreset = (p: (typeof PRESETS)[0]) => {
     setPrompt(p.prompt);
+    setDomainId(p.domain);
     setForceFault(p.forceFault);
     onPromptChange?.(p.prompt);
   };
@@ -87,9 +121,14 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
     onRun({
       prompt,
       algorithm,
+      domain_id: domainId,
       force_fault: forceFault,
       provider_type: providerType,
       llm_model: llmModel,
+      enumerate_graph: enumerateGraph,
+      max_nodes: maxNodes,
+      max_edges: maxNodes * 3,
+      graph_timeout: 4.0,
     });
   };
 
@@ -103,24 +142,19 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
           </h2>
         </div>
         <span className="rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-0.5 font-mono text-[10px] text-cyan-300">
-          {providerType === "mock"
-            ? "Offline Rule-Based Mock"
-            : providerType === "lmstudio"
-            ? "LM Studio (127.0.0.1:1234)"
-            : providerType === "ollama"
-            ? "Local 2B Model (Ollama)"
-            : providerType === "gemini"
-            ? "Google Gemini 1.5 Flash"
-            : "Cloud API"}
+          {domainId === "auto" ? "Auto-Routed Domain" : domainId}
         </span>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* Natural Language Prompt */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-300">
-            Natural Language Instruction
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-slate-300">
+              Natural Language Instruction
+            </label>
+            <span className="text-[10px] text-slate-500">Text-First NLP Input</span>
+          </div>
           <textarea
             value={prompt}
             onChange={(e) => {
@@ -129,13 +163,13 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
             }}
             rows={2}
             className="w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
-            placeholder="Type your robotic instruction..."
+            placeholder="Type your domain instruction (e.g. Move red box, Navigate kitchen, Transit AGV)..."
           />
 
           {/* Preset Chips */}
           <div className="mt-2.5">
             <span className="mb-1.5 block text-[11px] font-medium text-slate-400">
-              Capability Preset Library:
+              Multi-Domain Preset Library:
             </span>
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => (
@@ -149,6 +183,9 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
                       : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200"
                   }`}
                 >
+                  <span className="text-[9px] uppercase font-bold text-slate-500 mr-1">
+                    [{p.domainLabel}]
+                  </span>
                   {p.title}
                 </button>
               ))}
@@ -156,23 +193,25 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
           </div>
         </div>
 
-        {/* Configuration Row */}
+        {/* Configuration Row 1: Target Domain & Planner */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {/* Neural Engine */}
+          {/* Domain Selector */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-300">
-              Neural Formalizer Engine
+              Target Planning Domain
             </label>
             <select
-              value={providerType}
-              onChange={(e) => setProviderType(e.target.value)}
+              value={domainId}
+              onChange={(e) => setDomainId(e.target.value)}
               className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
             >
-              <option value="mock">Deterministic Zero-API (Offline)</option>
-              <option value="lmstudio">LM Studio Local Model (http://127.0.0.1:1234)</option>
-              <option value="ollama">Local 2B Model (Ollama: gemma2:2b / qwen2.5)</option>
-              <option value="gemini">Google Gemini 1.5 Flash (via API Key)</option>
-              <option value="openai">OpenAI Endpoint (gpt-4o-mini)</option>
+              <option value="auto">&rarr; Auto-Route via NLP Router</option>
+              <option value="blocks_world">Blocks World (4 Classical Operators)</option>
+              <option value="grid_world">Grid World (2D Spatial Navigation)</option>
+              <option value="household">Household Robotics (Multi-Room / Storage)</option>
+              <option value="warehouse">Warehouse Logistics (AGVs / Storage Racks)</option>
+              <option value="scheduling">Discrete Job Scheduling (Machine Allocation)</option>
+              <option value="software_workflow">Software Workflow (Gated CI/CD Release)</option>
             </select>
           </div>
 
@@ -193,18 +232,75 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
           </div>
         </div>
 
-        {/* Fault Injection Toggle */}
-        <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-300">
-          <input
-            type="checkbox"
-            id="fault-toggle"
-            checked={forceFault}
-            onChange={(e) => setForceFault(e.target.checked)}
-            className="h-4 w-4 rounded border-amber-500/50 bg-slate-950 text-amber-500 focus:ring-amber-400"
-          />
-          <label htmlFor="fault-toggle" className="cursor-pointer font-medium">
-            Simulate Initial Planning Fault (Showcases Counterexample Witness & Repair Loop)
-          </label>
+        {/* Configuration Row 2: Neural Formalizer & Graph Exploration */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* Neural Engine */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-300">
+              Neural Formalizer Engine
+            </label>
+            <select
+              value={providerType}
+              onChange={(e) => setProviderType(e.target.value)}
+              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+            >
+              <option value="mock">Deterministic Zero-API (Offline)</option>
+              <option value="lmstudio">LM Studio Local Model (http://127.0.0.1:1234)</option>
+              <option value="ollama">Local 2B Model (Ollama: gemma2:2b / qwen2.5)</option>
+              <option value="gemini">Google Gemini 1.5 Flash (via API Key)</option>
+              <option value="openai">OpenAI Endpoint (gpt-4o-mini)</option>
+            </select>
+          </div>
+
+          {/* State-Space Graph Enumeration Budget */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-slate-300">
+                Graph Explorer Budget
+              </label>
+              <span className="font-mono text-xs text-cyan-400">{maxNodes} states</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="30"
+                max="400"
+                step="10"
+                value={maxNodes}
+                onChange={(e) => setMaxNodes(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Fault Injection & State Graph Toggles */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-xs text-cyan-300">
+            <input
+              type="checkbox"
+              id="graph-toggle"
+              checked={enumerateGraph}
+              onChange={(e) => setEnumerateGraph(e.target.checked)}
+              className="h-4 w-4 rounded border-cyan-500/50 bg-slate-950 text-cyan-500 focus:ring-cyan-400"
+            />
+            <label htmlFor="graph-toggle" className="cursor-pointer font-medium">
+              Stream Complete Reachable State-Space Graph (Model B) to Explorer
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-2.5 text-xs text-amber-300">
+            <input
+              type="checkbox"
+              id="fault-toggle"
+              checked={forceFault}
+              onChange={(e) => setForceFault(e.target.checked)}
+              className="h-4 w-4 rounded border-amber-500/50 bg-slate-950 text-amber-500 focus:ring-amber-400"
+            />
+            <label htmlFor="fault-toggle" className="cursor-pointer font-medium">
+              Simulate Initial Planning Fault (Extracts Counterexample Witness & Repair)
+            </label>
+          </div>
         </div>
 
         {/* Action Button */}
@@ -220,7 +316,7 @@ export function TaskControlPanel({ onRun, isStreaming, onPromptChange }: TaskCon
           {isStreaming ? (
             <>
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-white" />
-              Streaming Formal Pipeline...
+              Streaming Neurosymbolic Pipeline...
             </>
           ) : (
             <>

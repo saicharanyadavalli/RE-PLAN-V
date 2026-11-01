@@ -8,10 +8,17 @@ import {
   FaultAttribution,
   GroundActionSchema,
   RepairConstraint,
+  GraphNode,
+  GraphEdge,
+  GraphStats,
 } from "../types/pipeline";
 
 export interface PipelineAccumulatedState {
   prompt: string;
+  domainId?: string;
+  domainConfidence?: number;
+  clarificationQuestion?: string;
+  unsupportedReason?: string;
   entities: Record<string, string>;
   initialFacts: any[];
   goalFacts: any[];
@@ -24,6 +31,7 @@ export interface PipelineAccumulatedState {
   counterexample?: CounterexampleWitness;
   attribution?: FaultAttribution;
   repairsApplied?: RepairConstraint[];
+  repairTimeMs?: number;
   finalPlan: GroundActionSchema[];
   isFinalVerified: boolean | null;
   executionTimeMs: number;
@@ -36,6 +44,11 @@ export interface PipelineAccumulatedState {
   cascadeCount?: number;
   backtrackCount?: number;
   treeLog?: Array<{ stage: string; message: string; timestamp: number; type: "info" | "warning" | "recovery" }>;
+  // Graph exploration state
+  graphNodes: GraphNode[];
+  graphEdges: GraphEdge[];
+  graphStats?: GraphStats;
+  graphStatus: "IDLE" | "ENUMERATING" | "COMPLETED" | "TRUNCATED";
 }
 
 const initialState: PipelineAccumulatedState = {
@@ -56,6 +69,9 @@ const initialState: PipelineAccumulatedState = {
   cascadeCount: 0,
   backtrackCount: 0,
   treeLog: [],
+  graphNodes: [],
+  graphEdges: [],
+  graphStatus: "IDLE",
 };
 
 export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080") {
@@ -97,7 +113,71 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080
             setEvents((prev) => [...prev, data]);
 
             // Update accumulated state stage by stage
-            if (data.stage === "BACKTRACK") {
+            if (data.stage === "DOMAIN_SELECTED") {
+              setState((prev) => ({
+                ...prev,
+                domainId: data.data.domain_id,
+                domainConfidence: data.data.confidence,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "DOMAIN", message: data.message, timestamp: data.timestamp || Date.now(), type: "info" },
+                ],
+              }));
+            } else if (data.stage === "CLARIFICATION_REQUIRED") {
+              setState((prev) => ({
+                ...prev,
+                clarificationQuestion: data.data.question || data.message,
+                unsupportedReason: undefined,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "CLARIFICATION", message: data.message, timestamp: data.timestamp || Date.now(), type: "warning" },
+                ],
+              }));
+              setIsStreaming(false);
+              ws.close();
+            } else if (data.stage === "TASK_UNSUPPORTED") {
+              setState((prev) => ({
+                ...prev,
+                unsupportedReason: data.data.explanation || data.message,
+                clarificationQuestion: undefined,
+                treeLog: [
+                  ...(prev.treeLog || []),
+                  { stage: "UNSUPPORTED", message: data.message, timestamp: data.timestamp || Date.now(), type: "warning" },
+                ],
+              }));
+              setIsStreaming(false);
+              ws.close();
+            } else if (data.stage === "GRAPH_ENUMERATION_STARTED") {
+              setState((prev) => ({
+                ...prev,
+                graphStatus: "ENUMERATING",
+                graphNodes: [],
+                graphEdges: [],
+                graphStats: undefined,
+              }));
+            } else if (data.stage === "GRAPH_NODE_BATCH") {
+              setState((prev) => ({
+                ...prev,
+                graphNodes: [...prev.graphNodes, ...(data.data.nodes || [])],
+              }));
+            } else if (data.stage === "GRAPH_EDGE_BATCH") {
+              setState((prev) => ({
+                ...prev,
+                graphEdges: [...prev.graphEdges, ...(data.data.edges || [])],
+              }));
+            } else if (data.stage === "GRAPH_ENUMERATION_COMPLETED") {
+              setState((prev) => ({
+                ...prev,
+                graphStats: data.data.stats,
+                graphStatus: "COMPLETED",
+              }));
+            } else if (data.stage === "GRAPH_ENUMERATION_TRUNCATED") {
+              setState((prev) => ({
+                ...prev,
+                graphStats: data.data.stats,
+                graphStatus: "TRUNCATED",
+              }));
+            } else if (data.stage === "BACKTRACK") {
               setState((prev) => ({
                 ...prev,
                 backtrackCount: (prev.backtrackCount || 0) + 1,
@@ -229,6 +309,9 @@ export function usePipelineWebSocket(backendUrl: string = "http://127.0.0.1:8080
               finalPlan: json.final_plan?.actions || [],
               isFinalVerified: json.final_verification?.is_valid,
               executionTimeMs: json.total_execution_time_ms || 0,
+              graphNodes: [],
+              graphEdges: [],
+              graphStatus: "IDLE",
             });
           } catch (err: any) {
             setError(err.message || "Failed to execute pipeline via REST fallback");

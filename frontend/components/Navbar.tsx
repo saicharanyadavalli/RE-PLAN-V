@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
-import { ShieldCheck, Cpu, Terminal, Sparkles, BookOpen } from "lucide-react";
+import { ShieldCheck, Cpu, Terminal, Sparkles, BookOpen, Network, Grid } from "lucide-react";
+
+export type NavTab = "demo" | "graph" | "domains" | "benchmark" | "architecture";
 
 interface NavbarProps {
-  activeTab: "demo" | "benchmark" | "architecture";
-  setActiveTab: (tab: "demo" | "benchmark" | "architecture") => void;
+  activeTab: NavTab;
+  setActiveTab: (tab: NavTab) => void;
   isStreaming: boolean;
   onOpenDefenseModal: () => void;
 }
@@ -22,11 +24,11 @@ export function Navbar({ activeTab, setActiveTab, isStreaming, onOpenDefenseModa
             <div className="flex items-center gap-2">
               <span className="font-mono text-lg font-bold tracking-tight text-white">RE-PLAN-V</span>
               <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-cyan-400">
-                NEUROSYMBOLIC CORE
+                MULTI-DOMAIN CORE
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Formal Plan Verification, Fault Attribution & Counterexample-Guided Repair
+              Generic Planning &bull; State-Space Graph Exploration &bull; Counterexample Repair
             </p>
           </div>
         </div>
@@ -43,6 +45,28 @@ export function Navbar({ activeTab, setActiveTab, isStreaming, onOpenDefenseModa
           >
             <Cpu className="h-3.5 w-3.5" />
             Mission Control
+          </button>
+          <button
+            onClick={() => setActiveTab("graph")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              activeTab === "graph"
+                ? "bg-cyan-500/20 text-cyan-300 shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Network className="h-3.5 w-3.5" />
+            State Space Explorer
+          </button>
+          <button
+            onClick={() => setActiveTab("domains")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+              activeTab === "domains"
+                ? "bg-cyan-500/20 text-cyan-300 shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Grid className="h-3.5 w-3.5" />
+            Domain Studio
           </button>
           <button
             onClick={() => setActiveTab("benchmark")}
@@ -80,7 +104,7 @@ export function Navbar({ activeTab, setActiveTab, isStreaming, onOpenDefenseModa
               }`}
             />
             <span className="font-mono text-[11px] text-slate-300">
-              {isStreaming ? "PIPELINE STREAMING..." : "SYMBOLIC CORE: ACTIVE"}
+              {isStreaming ? "PIPELINE STREAMING..." : "6 DOMAINS ACTIVE"}
             </span>
           </div>
 

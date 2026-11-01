@@ -73,7 +73,7 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
     print("-" * 80)
 
     # 3. 5-Class Fault Attribution Matrix Experiment
-    print(f"\n[3/3] Executing 5-Class Fault Attribution Matrix Experiment (50 instances, 10/class)...")
+    print(f"\n[3/4] Executing 5-Class Fault Attribution Matrix Experiment (50 instances, 10/class)...")
     attr_results = exp_runner.run_attribution_experiment(instances_per_class=10, seed=seed)
     print("\n" + "-" * 80)
     print(f"{'Injected Ground Truth':<24} | {'Precision':<10} | {'Recall':<10} | {'F1-Score':<10} | {'Support'}")
@@ -82,6 +82,19 @@ def run_all_benchmarks(num_instances: int = 10, seed: int = 42) -> None:
         print(f"{c_name:<24} | {p_data['precision']:<10.2f} | {p_data['recall']:<10.2f} | {p_data['f1_score']:<10.2f} | {p_data['support']}")
     print("-" * 80)
     print(f"Overall Attribution Macro Accuracy: {attr_results['accuracy'] * 100:.1f}% | Macro F1: {attr_results['macro_f1']:.2f}")
+
+    # 4. Multi-Domain Complexity Tiers (100–3000 States)
+    print(f"\n[4/4] Evaluating Multi-Domain Complexity Tier Coverage (6 Domains)...")
+    from benchmark.generator.multi_domain_generator import MultiDomainBenchmarkGenerator, ComplexityTier
+    tier_gen = MultiDomainBenchmarkGenerator(seed=seed)
+    tier_instances = tier_gen.generate_suite(instances_per_domain=1)
+    print("\n" + "-" * 80)
+    print(f"{'Domain ID':<24} | {'Complexity Tier':<16} | {'Est. States':<14} | {'Sample Goal'}")
+    print("-" * 80)
+    for ti in tier_instances:
+        goal_str = ", ".join(f"{g['predicate']}({','.join(g['arguments'])})" for g in ti.goal_conditions)
+        print(f"{ti.domain_id:<24} | {ti.tier.value:<16} | {ti.estimated_state_space:<14} | {goal_str[:28]}")
+    print("-" * 80)
 
     # Save summary report
     elapsed = time.perf_counter() - start_time

@@ -79,14 +79,83 @@ def run_attribution_matrix_live(instances_per_class: int = 10, seed: int = 42) -
 
 @router.get("/system/info")
 def get_system_info() -> Dict[str, Any]:
+    from core.domains import registry
     return {
         "app": "RE-PLAN-V",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "symbolic_core": "Authoritative STRIPS",
         "available_algorithms": ["A*", "BFS", "BEST_FIRST"],
-        "domains": ["blocks_world", "gridworld"],
+        "domains": [d.domain_id for d in registry.list_domains()],
+        "graph_mode": "Model B: Complete Reachable-State Graph",
         "research_question": "Can counterexample-guided fault attribution and automatic repair improve recovery from initially invalid plans compared with generic plan regeneration?",
     }
+
+
+@router.get("/domains")
+def get_domains() -> List[Dict[str, Any]]:
+    """Returns metadata, actions, predicates, and task examples for all 6 registered domains."""
+    from core.domains import registry
+    return registry.get_metadata_summary()
+
+
+class GraphEnumerateRequest(BaseModel):
+    domain_id: str = "blocks_world"
+    prompt: Optional[str] = "Stack the red box on the blue box."
+    max_nodes: int = 300
+    max_edges: int = 1000
+    timeout_seconds: float = 5.0
+
+
+@router.post("/graph/enumerate")
+def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
+    """Model B: Computes the complete reachable state-space graph."""
+    from core.domains import registry
+    from core.graph.enumerator import CompleteReachableGraphEnumerator
+    from core.world.predicates import Fact
+    from core.world.problem import SymbolicProblem
+    from core.world.state import SymbolicState
+    from core.world.types import ObjectRegistry
+    from interpretation.router import DomainRouter, RoutingOutcome
+
+    domain = registry.get(req.domain_id)
+    if not domain:
+        raise HTTPException(status_code=404, detail=f"Domain '{req.domain_id}' not found.")
+
+    router = DomainRouter(registry=registry)
+    routing = router.route(req.prompt or "Stack the red box on the blue box.")
+    if routing.outcome != RoutingOutcome.SUPPORTED:
+        return {
+            "status": routing.outcome.value,
+            "clarification_question": routing.clarification_question,
+            "explanation": routing.explanation,
+            "elements": [],
+        }
+
+    reg = ObjectRegistry(domain.type_hierarchy)
+    for obj_name, obj_type in routing.entities.items():
+        reg.register_object(obj_name, obj_type)
+
+    s0 = SymbolicState([
+        Fact(f.predicate, list(f.arguments)) for f in routing.initial_facts
+    ])
+    goals = [
+        Fact(f.predicate, list(f.arguments)) for f in routing.goal_facts
+    ]
+    problem = SymbolicProblem(
+        name=f"{domain.domain_id}_task",
+        domain_name=domain.domain_id,
+        registry=reg,
+        initial_state=s0,
+        goal_conditions=goals,
+    )
+
+    enumerator = CompleteReachableGraphEnumerator(
+        max_nodes=req.max_nodes,
+        max_edges=req.max_edges,
+        timeout_seconds=req.timeout_seconds,
+    )
+    graph = enumerator.enumerate_graph(problem, domain)
+    return graph.to_cytoscape()
 
 
 class FormalizeRequest(BaseModel):

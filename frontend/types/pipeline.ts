@@ -9,6 +9,70 @@ export interface GroundActionSchema {
   cost?: number;
 }
 
+export interface GraphNode {
+  id: string;
+  state_hash: string;
+  depth: number;
+  is_initial: boolean;
+  is_goal: boolean;
+  is_dead_end: boolean;
+  is_truncated_boundary: boolean;
+  facts: FactSchema[];
+  facts_summary: string[];
+  incoming_edges_count?: number;
+  outgoing_edges_count?: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  action_name: string;
+  action_args: string[];
+  cost: number;
+  is_cycle: boolean;
+}
+
+export interface GraphStats {
+  total_nodes: number;
+  total_edges: number;
+  max_depth_reached: number;
+  goal_node_ids: string[];
+  dead_end_node_ids: string[];
+  is_complete: boolean;
+  truncation_reason?: string | null;
+  enumeration_time_ms: number;
+}
+
+export interface ReachableStateGraph {
+  elements: Array<{ data: Record<string, any> }>;
+  stats: GraphStats;
+}
+
+export interface DomainMetadata {
+  domain_id: string;
+  display_name: string;
+  description: string;
+  complexity_rating: string;
+  entity_types: string[];
+  action_names: string[];
+  predicate_names: string[];
+  example_tasks: string[];
+  supported_features: string[];
+  unsupported_features: string[];
+}
+
+export interface RoutingResult {
+  outcome: "SUPPORTED" | "NEEDS_CLARIFICATION" | "UNSUPPORTED" | "INVALID_PROPOSAL";
+  selected_domain_id?: string;
+  domain_confidence: number;
+  clarification_question?: string;
+  explanation: string;
+  entities?: Record<string, string>;
+  initial_facts?: FactSchema[];
+  goal_facts?: FactSchema[];
+  negative_constraints?: FactSchema[];
+}
+
 export interface CounterexampleWitness {
   counterexample_id?: string;
   step_index?: number;
@@ -42,11 +106,19 @@ export interface RepairConstraint {
 export type PipelineStage =
   | "IDLE"
   | "PIPELINE_STARTED"
+  | "DOMAIN_SELECTED"
+  | "CLARIFICATION_REQUIRED"
+  | "TASK_UNSUPPORTED"
   | "INTERPRETATION_STARTED"
   | "INTERPRETATION_COMPLETED"
   | "VALIDATION_RESULT"
   | "VALIDATION_FAILED"
   | "BACKTRACK"
+  | "GRAPH_ENUMERATION_STARTED"
+  | "GRAPH_NODE_BATCH"
+  | "GRAPH_EDGE_BATCH"
+  | "GRAPH_ENUMERATION_COMPLETED"
+  | "GRAPH_ENUMERATION_TRUNCATED"
   | "SEARCH_STARTED"
   | "SEARCH_NODE_EXPANDED"
   | "SEARCH_COMPLETED"
@@ -97,7 +169,12 @@ export interface PipelineStreamEvent {
 export interface PipelineRunRequest {
   prompt: string;
   algorithm: string;
+  domain_id?: string;
   force_fault: boolean;
   provider_type: string;
   llm_model?: string;
+  enumerate_graph?: boolean;
+  max_nodes?: number;
+  max_edges?: number;
+  graph_timeout?: number;
 }
