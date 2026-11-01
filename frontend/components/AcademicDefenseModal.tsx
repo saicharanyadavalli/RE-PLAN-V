@@ -44,7 +44,7 @@ export function AcademicDefenseModal({ isOpen, onClose }: AcademicDefenseModalPr
               </p>
               <ul className="mt-2 list-disc pl-4 leading-relaxed text-slate-400">
                 <li><strong>First-Order Logic & MGU Unification</strong> in <code className="text-cyan-300">core/krr/</code>.</li>
-                <li><strong>A* with Relaxed Planning Graph (RPG) h_max heuristic</strong> in <code className="text-cyan-300">core/search/</code>.</li>
+                <li><strong>A* with Admissible Heuristics</strong> in <code className="text-cyan-300">core/search/</code>.</li>
                 <li><strong>Authoritative STRIPS verifier</strong> in <code className="text-cyan-300">core/verification/</code>.</li>
                 <li><strong>Minimal Counterexample Witness generator</strong> in <code className="text-cyan-300">core/counterexamples/</code>.</li>
                 <li><strong>5-Class Fault Attribution & Negative Pruning Repair</strong> in <code className="text-cyan-300">core/attribution/</code> and <code className="text-cyan-300">core/repair/</code>.</li>
@@ -83,7 +83,7 @@ export function AcademicDefenseModal({ isOpen, onClose }: AcademicDefenseModalPr
                 <div>
                   <strong className="text-cyan-300">Q: Why did you use A* over BFS?</strong>
                   <p className="mt-0.5 text-slate-400">
-                    BFS expands exponentially. A* uses our admissible RPG h_max heuristic to compute distances in polynomial time by ignoring delete effects, finding optimal plans in &lt; 4 ms.
+                    BFS expands nodes uniformly. A* uses admissible heuristics (such as uniform-cost zero heuristic or RPG) to guarantee optimal plan cost over non-negative actions, finding plans in &lt; 4 ms.
                   </p>
 
                 </div>

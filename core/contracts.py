@@ -82,6 +82,7 @@ class PlanSchema(BaseModel):
     nodes_expanded: int = Field(default=0)
     nodes_generated: int = Field(default=0)
     is_success: bool = Field(default=True)
+    is_optimal: bool = Field(default=False, description="Whether the plan is guaranteed to have optimal cost")
     failure_reason: Optional[str] = Field(default=None)
 
 

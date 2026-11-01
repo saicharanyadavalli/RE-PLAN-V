@@ -225,7 +225,7 @@ export function TaskControlPanel({
               onChange={(e) => setAlgorithm(e.target.value)}
               className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
             >
-              <option value="A*">A* Search (Optimal RPG h_max)</option>
+              <option value="A*">A* Search (Optimal Uniform-Cost / Admissible)</option>
               <option value="BFS">Breadth-First Search (BFS)</option>
               <option value="BEST_FIRST">Greedy Best-First Search</option>
             </select>

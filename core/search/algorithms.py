@@ -73,6 +73,7 @@ class BFSPlanner(BasePlanner):
                 nodes_expanded=0,
                 nodes_generated=1,
                 is_success=True,
+                is_optimal=True,
             )
 
         root = SearchNode(state=problem.initial_state)
@@ -152,6 +153,7 @@ class BFSPlanner(BasePlanner):
                         nodes_expanded=nodes_expanded,
                         nodes_generated=nodes_generated + 1,
                         is_success=True,
+                        is_optimal=True,
                     )
 
                 # 6. Cycle detection
@@ -206,6 +208,7 @@ class BestFirstPlanner(BasePlanner):
                 nodes_expanded=0,
                 nodes_generated=1,
                 is_success=True,
+                is_optimal=False,
             )
 
         root_h = h_fn.compute(problem.initial_state, problem.goal_conditions)
@@ -263,6 +266,7 @@ class BestFirstPlanner(BasePlanner):
                     nodes_expanded=nodes_expanded,
                     nodes_generated=nodes_generated,
                     is_success=True,
+                    is_optimal=False,
                 )
 
             applicable = action_gen.get_applicable_actions(curr_node.state)
@@ -323,7 +327,8 @@ class AStarPlanner(BasePlanner):
         prune_action_callback: Optional[Callable[[SymbolicState, GroundAction], bool]] = None,
     ) -> PlanSchema:
         start_time = time.perf_counter()
-        h_fn = heuristic or GoalCountHeuristic()
+        h_fn = heuristic or ZeroHeuristic()
+        is_admissible = isinstance(h_fn, ZeroHeuristic) or getattr(h_fn, "is_admissible", False)
         forbidden = forbidden_actions or set()
 
         if problem.is_goal_satisfied(problem.initial_state):
@@ -336,6 +341,7 @@ class AStarPlanner(BasePlanner):
                 nodes_expanded=0,
                 nodes_generated=1,
                 is_success=True,
+                is_optimal=True,
             )
 
         root_h = h_fn.compute(problem.initial_state, problem.goal_conditions)
@@ -394,6 +400,7 @@ class AStarPlanner(BasePlanner):
                     nodes_expanded=nodes_expanded,
                     nodes_generated=nodes_generated,
                     is_success=True,
+                    is_optimal=is_admissible,
                 )
 
             applicable = action_gen.get_applicable_actions(curr_node.state)
