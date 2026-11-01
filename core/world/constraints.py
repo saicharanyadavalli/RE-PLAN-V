@@ -85,6 +85,49 @@ class ProhibitedEntityActionConstraint(HardConstraint):
 
     def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
         act = action_name.strip().lower()
-        if (not self.prohibited_actions or act in self.prohibited_actions) and self.protected_entity in action_args:
+        if self.prohibited_actions and act in self.prohibited_actions and self.protected_entity in action_args:
             return False, f"Hard constraint violation: action '{action_name}' on protected entity '{self.protected_entity}' is strictly forbidden."
+        return True, None
+
+
+class ForbidActionConstraint(HardConstraint):
+    """Prohibits any execution of a specific action name regardless of arguments."""
+
+    def __init__(self, forbidden_action: str, description: str = "") -> None:
+        act = forbidden_action.strip().lower()
+        super().__init__(name=f"forbid_action_{act}", description=description)
+        self.forbidden_action = act
+
+    def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
+        if action_name.strip().lower() == self.forbidden_action:
+            return False, f"Hard constraint violation: action '{action_name}' is strictly forbidden."
+        return True, None
+
+
+class ForbidActionBindingConstraint(HardConstraint):
+    """Prohibits executing an action when a specific entity is bound to its arguments."""
+
+    def __init__(
+        self,
+        forbidden_action: str,
+        entity: str,
+        arg_index: Optional[int] = None,
+        description: str = "",
+    ) -> None:
+        act = forbidden_action.strip().lower()
+        ent = entity.strip()
+        name = f"forbid_binding_{act}_{ent}" if arg_index is None else f"forbid_binding_{act}_{ent}_at_{arg_index}"
+        super().__init__(name=name, description=description)
+        self.forbidden_action = act
+        self.entity = ent
+        self.arg_index = arg_index
+
+    def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
+        if action_name.strip().lower() == self.forbidden_action:
+            if self.arg_index is not None:
+                if 0 <= self.arg_index < len(action_args) and action_args[self.arg_index] == self.entity:
+                    return False, f"Hard constraint violation: action '{action_name}' with '{self.entity}' at position {self.arg_index} is strictly forbidden."
+            else:
+                if self.entity in action_args:
+                    return False, f"Hard constraint violation: action '{action_name}' with entity '{self.entity}' is strictly forbidden."
         return True, None

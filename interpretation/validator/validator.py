@@ -10,7 +10,12 @@ from core.contracts import (
     TaskProposalSchema,
     ValidationStatus,
 )
-from core.world.constraints import NegativeFactInvariant, ProhibitedEntityActionConstraint
+from core.world.constraints import (
+    HardConstraint,
+    Invariant,
+    NegativeFactInvariant,
+    ProhibitedEntityActionConstraint,
+)
 from core.world.predicates import Fact
 from core.world.problem import SymbolicProblem
 from core.world.state import SymbolicState
@@ -45,7 +50,7 @@ class ConsistencyValidator:
                         f"Unknown entity reference '{arg}' in condition '{f.to_string()}'. Must be in entities dict."
                     )
 
-        # 3. Validate Predicates and Arities against Domain
+        # 3. Validate Predicates, Arities, and Argument Types against Domain
         for f in all_facts:
             pred_name = f.predicate.lower()
             if pred_name not in domain.predicates:
@@ -58,6 +63,13 @@ class ConsistencyValidator:
                     errors.append(
                         f"Arity mismatch for '{pred_name}' in '{f.to_string()}': expected {pred_def.arity} arguments, got {len(f.arguments)}."
                     )
+                else:
+                    for idx, (arg, exp_type) in enumerate(zip(f.arguments, pred_def.arg_types)):
+                        actual_type = proposal.entities.get(arg)
+                        if actual_type and not domain.type_hierarchy.is_subtype(actual_type, exp_type):
+                            errors.append(
+                                f"Type mismatch for predicate '{pred_name}' argument {idx} ('{arg}'): entity type '{actual_type}' is not a subtype of expected '{exp_type}'."
+                            )
 
         # 4. Check for Direct Logical Contradictions in Initial Facts
         seen_facts: Set[Tuple[str, Tuple[str, ...]]] = set()
@@ -135,14 +147,30 @@ class ConsistencyValidator:
                     f"Direct contradiction: goal condition '{neg.to_string()}' is simultaneously declared as a negative constraint."
                 )
 
+        # Check domain default invariants on initial state if no prior errors
+        if not errors and proposal.initial_facts:
+            try:
+                init_state_test = SymbolicState(
+                    facts=[Fact.from_schema(f) for f in proposal.initial_facts if not f.is_negated],
+                    objects=registry.get_all_objects(),
+                )
+                for inv in getattr(domain, "default_invariants", []):
+                    sat, inv_msg = inv.check(init_state_test)
+                    if not sat:
+                        errors.append(f"Domain invariant violation in initial state: {inv_msg}")
+            except Exception:
+                pass
+
         if errors:
             status = ValidationStatus.CONTRADICTION if any(
-                k in errors[0] for k in ("Contradiction", "Contradictory", "Mutex violation", "simultaneously")
+                k in errors[0] for k in ("Contradiction", "Contradictory", "Mutex violation", "simultaneously", "invariant violation")
             ) else ValidationStatus.SCHEMA_ERROR
             if any("Unknown entity" in e for e in errors):
                 status = ValidationStatus.UNKNOWN_ENTITY
             elif any("Arity mismatch" in e for e in errors):
                 status = ValidationStatus.ARITY_MISMATCH
+            elif any("Type mismatch" in e for e in errors):
+                status = ValidationStatus.TYPE_MISMATCH
             elif any("Unsupported predicate" in e for e in errors):
                 status = ValidationStatus.UNSUPPORTED_OPERATOR
 
@@ -189,20 +217,22 @@ class ConsistencyValidator:
         goal_facts = [Fact.from_schema(g) for g in proposal.goal_facts]
 
         # Convert negative constraints to Invariants or HardConstraints
-        invariants = []
-        hard_constraints = []
+        invariants: List[Invariant] = list(getattr(domain, "default_invariants", []))
+        hard_constraints: List[HardConstraint] = []
+
+        for inv_fact in getattr(proposal, "invariants", []):
+            fact_cond = Fact.from_schema(inv_fact)
+            if inv_fact.is_negated:
+                invariants.append(NegativeFactInvariant(fact_cond.positive_version()))
 
         for neg in proposal.negative_constraints:
             fact_cond = Fact.from_schema(neg)
-            invariants.append(NegativeFactInvariant(fact_cond.positive_version()))
-            if fact_cond.arguments:
-                hard_constraints.append(
-                    ProhibitedEntityActionConstraint(
-                        protected_entity=fact_cond.arguments[0],
-                        prohibited_actions=[],
-                        description=f"Protect {fact_cond.arguments[0]} as requested in task.",
-                    )
+            invariants.append(
+                NegativeFactInvariant(
+                    fact_cond.positive_version(),
+                    description=f"Negative constraint: {fact_cond.to_string()} must never hold.",
                 )
+            )
 
         return SymbolicProblem(
             name=problem_name,

@@ -288,7 +288,12 @@ class DomainRouter:
             env_clean = env.replace(" ", "_")
             if domain_id == "software_workflow":
                 entities[env_clean] = "environment"
-                pkg_id = "pkg_v1"
+                pkg_matches = re.findall(r"\b(pkg_[a-z0-9_]+|artifact_[a-z0-9_]+|image_[a-z0-9_]+|bundle_[a-z0-9_]+)\b", text)
+                commit_matches = re.findall(r"\b(commit_[a-z0-9_]+|release_[a-z0-9_]+|sha_[a-z0-9_]+|v\d+[\w.]*)\b", text)
+                commit_id = commit_matches[0] if commit_matches else "commit_v1"
+                pkg_id = pkg_matches[0] if pkg_matches else (
+                    next((k for k, v in entities.items() if v == "artifact"), f"pkg_{commit_id}")
+                )
                 entities[pkg_id] = "artifact"
                 negative_constraints.append(FactSchema(predicate="deployed_to", arguments=(pkg_id, env_clean)))
 
@@ -328,7 +333,12 @@ class DomainRouter:
                 negative_constraints.append(FactSchema(predicate="carrier_at", arguments=("carrier_1", zone_id)))
             elif domain_id == "software_workflow":
                 entities[target_clean] = "environment"
-                pkg_id = "pkg_v1"
+                pkg_matches = re.findall(r"\b(pkg_[a-z0-9_]+|artifact_[a-z0-9_]+|image_[a-z0-9_]+|bundle_[a-z0-9_]+)\b", text)
+                commit_matches = re.findall(r"\b(commit_[a-z0-9_]+|release_[a-z0-9_]+|sha_[a-z0-9_]+|v\d+[\w.]*)\b", text)
+                commit_id = commit_matches[0] if commit_matches else "commit_v1"
+                pkg_id = pkg_matches[0] if pkg_matches else (
+                    next((k for k, v in entities.items() if v == "artifact"), f"pkg_{commit_id}")
+                )
                 entities[pkg_id] = "artifact"
                 negative_constraints.append(FactSchema(predicate="deployed_to", arguments=(pkg_id, target_clean)))
 
