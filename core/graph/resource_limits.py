@@ -40,53 +40,94 @@ class GraphBudgetConfig(BaseModel):
     prompt: Optional[str] = "Stack the red box on the blue box."
     max_nodes: int = Field(default=GraphBudgetLimits.DEFAULT_NODES)
     max_edges: int = Field(default=GraphBudgetLimits.DEFAULT_EDGES)
-    timeout_seconds: float = Field(default=GraphBudgetLimits.DEFAULT_TIMEOUT)
+    timeout_seconds: float = Field(default=GraphBudgetLimits.DEFAULT_TIMEOUT_SECONDS)
 
     @field_validator("max_nodes", mode="before")
     @classmethod
     def validate_nodes(cls, v: Any) -> int:
+        if v is None:
+            raise ValueError("max_nodes cannot be None.")
         if isinstance(v, bool):
-            raise ValueError("Boolean values are not valid node limits.")
-        try:
-            val = int(v)
-        except (TypeError, ValueError):
-            raise ValueError(f"Invalid max_nodes value: {v}")
-        if val < GraphBudgetLimits.MIN_NODES:
-            raise ValueError(f"max_nodes must be >= {GraphBudgetLimits.MIN_NODES}, got {val}")
-        if val > GraphBudgetLimits.MAX_NODES:
-            raise ValueError(f"max_nodes cannot exceed hard maximum {GraphBudgetLimits.MAX_NODES}, got {val}")
+            raise ValueError("Boolean values are not valid integer limits.")
+        if isinstance(v, float):
+            raise ValueError("Float values are not valid integer limits.")
+        if isinstance(v, str):
+            if "." in v:
+                raise ValueError("Fractional string values are not valid integer limits.")
+            if v.lower() in ("nan", "inf", "-inf", "+inf", "infinity", "-infinity", "+infinity"):
+                raise ValueError("Non-finite values are not valid integer limits.")
+            try:
+                val = int(v)
+            except (TypeError, ValueError):
+                raise ValueError(f"Invalid max_nodes value: {v}")
+        elif isinstance(v, int):
+            val = v
+        else:
+            try:
+                val = int(v)
+            except (TypeError, ValueError):
+                raise ValueError(f"Invalid max_nodes value: {v}")
+
+        if not (GraphBudgetLimits.MIN_NODES <= val <= GraphBudgetLimits.MAX_NODES):
+            raise ValueError(
+                f"max_nodes must be between {GraphBudgetLimits.MIN_NODES} and {GraphBudgetLimits.MAX_NODES}, got {val}"
+            )
         return val
 
     @field_validator("max_edges", mode="before")
     @classmethod
     def validate_edges(cls, v: Any) -> int:
+        if v is None:
+            raise ValueError("max_edges cannot be None.")
         if isinstance(v, bool):
-            raise ValueError("Boolean values are not valid edge limits.")
-        try:
-            val = int(v)
-        except (TypeError, ValueError):
-            raise ValueError(f"Invalid max_edges value: {v}")
-        if val < GraphBudgetLimits.MIN_EDGES:
-            raise ValueError(f"max_edges must be >= {GraphBudgetLimits.MIN_EDGES}, got {val}")
-        if val > GraphBudgetLimits.MAX_EDGES:
-            raise ValueError(f"max_edges cannot exceed hard maximum {GraphBudgetLimits.MAX_EDGES}, got {val}")
+            raise ValueError("Boolean values are not valid integer limits.")
+        if isinstance(v, float):
+            raise ValueError("Float values are not valid integer limits.")
+        if isinstance(v, str):
+            if "." in v:
+                raise ValueError("Fractional string values are not valid integer limits.")
+            if v.lower() in ("nan", "inf", "-inf", "+inf", "infinity", "-infinity", "+infinity"):
+                raise ValueError("Non-finite values are not valid integer limits.")
+            try:
+                val = int(v)
+            except (TypeError, ValueError):
+                raise ValueError(f"Invalid max_edges value: {v}")
+        elif isinstance(v, int):
+            val = v
+        else:
+            try:
+                val = int(v)
+            except (TypeError, ValueError):
+                raise ValueError(f"Invalid max_edges value: {v}")
+
+        if not (GraphBudgetLimits.MIN_EDGES <= val <= GraphBudgetLimits.MAX_EDGES):
+            raise ValueError(
+                f"max_edges must be between {GraphBudgetLimits.MIN_EDGES} and {GraphBudgetLimits.MAX_EDGES}, got {val}"
+            )
         return val
 
     @field_validator("timeout_seconds", mode="before")
     @classmethod
     def validate_timeout(cls, v: Any) -> float:
+        if v is None:
+            raise ValueError("timeout_seconds cannot be None.")
         if isinstance(v, bool):
             raise ValueError("Boolean values are not valid timeout values.")
+        if isinstance(v, str):
+            if v.lower() in ("nan", "inf", "-inf", "+inf", "infinity", "-infinity", "+infinity"):
+                raise ValueError("timeout_seconds must be a finite number.")
         try:
             val = float(v)
         except (TypeError, ValueError):
             raise ValueError(f"Invalid timeout_seconds value: {v}")
-        if not math.isfinite(val) or math.isnan(val):
+
+        if math.isnan(val) or math.isinf(val) or not math.isfinite(val):
             raise ValueError("timeout_seconds must be a finite number.")
-        if val < GraphBudgetLimits.MIN_TIMEOUT:
-            raise ValueError(f"timeout_seconds must be >= {GraphBudgetLimits.MIN_TIMEOUT}, got {val}")
-        if val > GraphBudgetLimits.MAX_TIMEOUT:
-            raise ValueError(f"timeout_seconds cannot exceed hard maximum {GraphBudgetLimits.MAX_TIMEOUT}, got {val}")
+
+        if val <= 0.0 or val < GraphBudgetLimits.MIN_TIMEOUT_SECONDS or val > GraphBudgetLimits.MAX_TIMEOUT_SECONDS:
+            raise ValueError(
+                f"timeout_seconds must be between {GraphBudgetLimits.MIN_TIMEOUT_SECONDS} and {GraphBudgetLimits.MAX_TIMEOUT_SECONDS}, got {val}"
+            )
         return val
 
 
@@ -115,7 +156,7 @@ class GraphConcurrencyManager:
         return acquired
 
     def acquire(self, blocking: bool = False) -> bool:
-        """Alias for try_acquire / acquire."""
+        """Acquires a concurrency slot (non-blocking by default). Returns True if acquired."""
         if not blocking:
             return self.try_acquire()
         self._semaphore.acquire(blocking=True)
@@ -128,7 +169,16 @@ class GraphConcurrencyManager:
         with self._count_lock:
             if self._active_count > 0:
                 self._active_count -= 1
-                self._semaphore.release()
+                try:
+                    self._semaphore.release()
+                except ValueError:
+                    pass
+
+    def __enter__(self) -> bool:
+        return self.acquire()
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.release()
 
     @property
     def max_concurrent(self) -> int:

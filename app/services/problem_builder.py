@@ -58,6 +58,107 @@ class ValidatedProblemBuilder:
         self.validator = validator or ConsistencyValidator()
         self.llm_provider = llm_provider or MockLLMProvider()
 
+    def build_from_proposal(
+        self,
+        proposal: TaskProposalSchema,
+        domain: Domain,
+        *,
+        problem_name: str = "validated_task",
+        routing_result: Optional[DomainRoutingResult] = None,
+    ) -> ProblemBuildResult:
+        """Constructs an authoritative, fully validated SymbolicProblem from an existing proposal.
+
+        Accepts an already interpreted proposal and an already resolved registered domain.
+        Does NOT call the LLM or perform domain routing.
+        """
+        # Merge routing_result.typed_constraints and routing_result.negative_constraints only
+        # when the proposal does not already contain the relevant values, preserving explicit
+        # proposal constraints and avoiding duplicates.
+        if routing_result is not None:
+            if routing_result.typed_constraints:
+                if proposal.typed_constraints is None:
+                    proposal.typed_constraints = []
+                for tc in routing_result.typed_constraints:
+                    if tc not in proposal.typed_constraints:
+                        proposal.typed_constraints.append(tc)
+
+            if routing_result.negative_constraints:
+                if proposal.negative_constraints is None:
+                    proposal.negative_constraints = []
+                for nc in routing_result.negative_constraints:
+                    if nc not in proposal.negative_constraints:
+                        proposal.negative_constraints.append(nc)
+
+        # Validate proposal using self.validator.validate
+        val_res = self.validator.validate(proposal, domain)
+        if not val_res.is_valid:
+            return ProblemBuildResult(
+                is_success=False,
+                domain=domain,
+                proposal=proposal,
+                outcome=RoutingOutcome.INVALID_PROPOSAL,
+                status="INVALID",
+                error_message="; ".join(val_res.errors),
+                validation_result=val_res,
+                routing_result=routing_result,
+            )
+
+        validated_proposal = val_res.validated_proposal or proposal
+
+        # Convert to SymbolicProblem
+        problem = self.validator.convert_to_problem(
+            validated_proposal,
+            domain,
+            problem_name=problem_name,
+        )
+
+        # Check initial state against BOTH domain invariants and problem invariants
+        dom_ok, dom_err = domain.check_invariants(problem.initial_state)
+        if not dom_ok:
+            return ProblemBuildResult(
+                is_success=False,
+                domain=domain,
+                proposal=validated_proposal,
+                problem=problem,
+                status="INVARIANT_VIOLATION",
+                error_message=f"Initial state violates invariants: {dom_err}",
+                validation_result=ProposalValidationResult(
+                    status=ValidationStatus.CONTRADICTION,
+                    is_valid=False,
+                    errors=[f"Initial state invariant violation: {dom_err}"],
+                    validated_proposal=None,
+                ),
+                routing_result=routing_result,
+            )
+
+        prob_ok, prob_err = problem.check_invariants(problem.initial_state)
+        if not prob_ok:
+            return ProblemBuildResult(
+                is_success=False,
+                domain=domain,
+                proposal=validated_proposal,
+                problem=problem,
+                status="INVARIANT_VIOLATION",
+                error_message=f"Initial state violates invariants: {prob_err}",
+                validation_result=ProposalValidationResult(
+                    status=ValidationStatus.CONTRADICTION,
+                    is_valid=False,
+                    errors=[f"Initial state invariant violation: {prob_err}"],
+                    validated_proposal=None,
+                ),
+                routing_result=routing_result,
+            )
+
+        return ProblemBuildResult(
+            is_success=True,
+            domain=domain,
+            proposal=validated_proposal,
+            problem=problem,
+            status="SUCCESS",
+            validation_result=val_res,
+            routing_result=routing_result,
+        )
+
     def build_problem(
         self,
         prompt: str,
@@ -127,12 +228,6 @@ class ValidatedProblemBuilder:
                 routing_result=routing,
             )
 
-        # Merge typed constraints and negative constraints from routing if not already present
-        if not proposal.typed_constraints and routing.typed_constraints:
-            proposal.typed_constraints = list(routing.typed_constraints)
-        if not proposal.negative_constraints and routing.negative_constraints:
-            proposal.negative_constraints = list(routing.negative_constraints)
-
         # If proposal is empty, fail closed
         if not proposal.entities or not proposal.goal_facts:
             return ProblemBuildResult(
@@ -145,53 +240,10 @@ class ValidatedProblemBuilder:
                 routing_result=routing,
             )
 
-        # Step 3: Proposal validation (entities, arities, types, mutexes, invariants)
-        val_res = self.validator.validate(proposal, domain)
-        if not val_res.is_valid:
-            return ProblemBuildResult(
-                is_success=False,
-                domain=domain,
-                proposal=proposal,
-                outcome=RoutingOutcome.INVALID_PROPOSAL,
-                status="INVALID",
-                error_message="; ".join(val_res.errors),
-                validation_result=val_res,
-                routing_result=routing,
-            )
-
-        validated_proposal = val_res.validated_proposal or proposal
-
-        # Step 4: Construct authoritative SymbolicProblem
-        # This converts invariants, default domain invariants, and typed constraints
-        problem = self.validator.convert_to_problem(
-            validated_proposal, domain, problem_name=problem_name
-        )
-
-        # Step 5: Check initial state against problem invariants
-        init_ok, init_err = problem.check_invariants(problem.initial_state)
-        if not init_ok:
-            return ProblemBuildResult(
-                is_success=False,
-                domain=domain,
-                proposal=validated_proposal,
-                problem=problem,
-                status="INVARIANT_VIOLATION",
-                error_message=f"Initial state violates domain invariants: {init_err}",
-                validation_result=ProposalValidationResult(
-                    status=ValidationStatus.CONTRADICTION,
-                    is_valid=False,
-                    errors=[f"Initial state invariant violation: {init_err}"],
-                    validated_proposal=None,
-                ),
-                routing_result=routing,
-            )
-
-        return ProblemBuildResult(
-            is_success=True,
+        # Delegate validation, constraint merging, and SymbolicProblem construction to build_from_proposal
+        return self.build_from_proposal(
+            proposal=proposal,
             domain=domain,
-            proposal=validated_proposal,
-            problem=problem,
-            status="SUCCESS",
-            validation_result=val_res,
+            problem_name=problem_name,
             routing_result=routing,
         )

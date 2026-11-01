@@ -12,15 +12,19 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.services.pipeline import PipelineOrchestrator, PLANNER_CASCADE
+from app.services.problem_builder import ProblemBuildResult, ValidatedProblemBuilder
 from core.contracts import (
     GroundActionSchema,
     PipelineDecisionTrace,
     PipelineStageStatus,
     PlanSchema,
+    ProposalValidationResult,
     StageAttemptRecord,
+    ValidationStatus,
     VerificationResultSchema,
 )
 from core.logger import get_logger
+from interpretation.router import RoutingOutcome
 
 logger = get_logger("websocket_router")
 router = APIRouter()
@@ -109,6 +113,11 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
         else:
             active_provider = orchestrator.llm_provider
 
+        builder = getattr(orchestrator, "problem_builder", None) or ValidatedProblemBuilder(
+            validator=orchestrator.validator,
+            llm_provider=orchestrator.llm_provider,
+        )
+
         trace = PipelineDecisionTrace()
         last_validation_errors: Optional[List[str]] = None
 
@@ -167,47 +176,54 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
                 if getattr(routing, "negative_constraints", None) and not getattr(proposal, "negative_constraints", []):
                     proposal.negative_constraints = list(routing.negative_constraints)
 
-            # ─── Stage 2: Validation ──────────────────────────────────
+            # ─── Stage 2: Validation & Problem Construction ───────────
             t1 = time.perf_counter()
-            val_res = orchestrator.validator.validate(proposal, target_domain)
+            build_res = builder.build_from_proposal(proposal, target_domain, routing_result=routing if 'routing' in locals() else None)
             t_val_ms = (time.perf_counter() - t1) * 1000.0
 
+            is_valid = build_res.validation_result.is_valid if build_res.validation_result else build_res.is_success
             await emit("INTERPRETATION_COMPLETED",
-                f"Task formalized in {t_interp_ms:.1f} ms. Schema valid: {val_res.is_valid}.",
+                f"Task formalized in {t_interp_ms:.1f} ms. Schema valid: {is_valid}.",
                 {
                     "entities": proposal.entities,
                     "goal_facts": [f.model_dump() for f in proposal.goal_facts],
                     "initial_facts": [f.model_dump() for f in proposal.initial_facts],
                     "negative_constraints": [f.model_dump() for f in proposal.negative_constraints],
                     "typed_constraints": [tc.model_dump() for tc in getattr(proposal, "typed_constraints", [])],
-                    "is_valid": val_res.is_valid,
+                    "is_valid": is_valid,
                     "provider_used": provider_name,
                     "stage_duration_ms": round(t_interp_ms, 2),
                     "validation_duration_ms": round(t_val_ms, 2),
                 })
 
-            if not val_res.is_valid:
-                if backtrack_idx < orchestrator.max_backtracks:
-                    last_validation_errors = val_res.errors
-                    trace.backtracks += 1
-                    trace.recovery_path.append(f"backtrack_validation_{backtrack_idx + 1}")
-                    await emit("VALIDATION_FAILED",
-                        f"Validation failed: {val_res.errors}. Backtracking to re-interpret...",
-                        {"errors": val_res.errors, "will_retry": True})
-                    continue  # ← BACKTRACK
+            if not build_res.is_success:
+                if build_res.status == "INVALID":
+                    errors = build_res.validation_result.errors if build_res.validation_result else [build_res.error_message or "Unknown validation error"]
+                    if backtrack_idx < orchestrator.max_backtracks:
+                        last_validation_errors = errors
+                        trace.backtracks += 1
+                        trace.recovery_path.append(f"backtrack_validation_{backtrack_idx + 1}")
+                        await emit("VALIDATION_FAILED",
+                            f"Validation failed: {errors}. Backtracking to re-interpret...",
+                            {"errors": errors, "will_retry": True})
+                        continue  # ← BACKTRACK
 
-                await emit("ERROR", f"Symbolic consistency validation failed after {trace.backtracks} retries: {val_res.errors}", {})
+                    await emit("ERROR", f"Symbolic consistency validation failed after {trace.backtracks} retries: {errors}", {})
+                    return
+
+                if build_res.status == "INVARIANT_VIOLATION":
+                    await emit("INITIAL_STATE_INVARIANT_VIOLATION", f"Initial state violates invariants: {build_res.error_message}", {
+                        "error": build_res.error_message,
+                    })
+                    return  # MANDATORY TERMINAL RETURN: NEVER proceed to graph enumeration or planner search!
+
+                await emit("ERROR", build_res.error_message or f"Problem building failed with status {build_res.status}", {
+                    "status": build_res.status,
+                })
                 return
 
-            # ─── Stage 3: Planning (with cascade) ─────────────────────
-            problem = orchestrator.validator.convert_to_problem(proposal, target_domain)
-
-            # Fail-closed check: validate initial state invariants
-            init_ok, init_err = problem.check_invariants(problem.initial_state)
-            if not init_ok:
-                await emit("INITIAL_STATE_INVARIANT_VIOLATION", f"Initial state violates invariants: {init_err}", {
-                    "error": init_err,
-                })
+            problem = build_res.problem
+            assert problem is not None, "SymbolicProblem must not be None when build_res.is_success is True"
 
             # ─── Stage 2.5: Model B Complete Reachable-State Graph Enumeration
             if req.get("enumerate_graph", True):
@@ -485,3 +501,7 @@ async def websocket_pipeline_endpoint(websocket: WebSocket):
             await websocket.send_json({"stage": "ERROR", "message": str(e), "data": {}})
         except Exception:
             pass
+
+
+# Export alias for compatibility
+handle_websocket_pipeline = websocket_pipeline_endpoint

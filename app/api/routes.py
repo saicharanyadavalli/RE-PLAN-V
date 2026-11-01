@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.services.pipeline import PipelineExecutionResult, PipelineOrchestrator
 from app.services.problem_builder import ValidatedProblemBuilder
-from core.graph.resource_limits import GraphBudgetLimits, graph_concurrency_manager
+from core.graph.resource_limits import GraphBudgetConfig, GraphBudgetLimits, graph_concurrency_manager
 from evaluation.experiments.runner import ExperimentRunner
 
 router = APIRouter(prefix="/api")
@@ -119,65 +119,46 @@ def get_domain_details(domain_id: str) -> Dict[str, Any]:
     return dom.to_dict()
 
 
-class GraphEnumerateRequest(BaseModel):
-    domain_id: str = "blocks_world"
-    prompt: Optional[str] = "Stack the red box on the blue box."
-    max_nodes: int = Field(default=300, ge=GraphBudgetLimits.MIN_NODES, le=GraphBudgetLimits.MAX_NODES)
-    max_edges: int = Field(default=1000, ge=GraphBudgetLimits.MIN_EDGES, le=GraphBudgetLimits.MAX_EDGES)
-    timeout_seconds: float = Field(default=5.0, ge=GraphBudgetLimits.MIN_TIMEOUT_SECONDS, le=GraphBudgetLimits.MAX_TIMEOUT_SECONDS)
-
-    @field_validator("max_nodes", "max_edges", mode="before")
-    @classmethod
-    def reject_bool_and_non_int(cls, v: Any) -> int:
-        if isinstance(v, bool) or not isinstance(v, int):
-            raise ValueError("Must be a strict integer")
-        return v
-
-    @field_validator("timeout_seconds", mode="before")
-    @classmethod
-    def validate_timeout(cls, v: Any) -> float:
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
-            raise ValueError("Must be a float or integer")
-        val = float(v)
-        if math.isnan(val) or math.isinf(val):
-            raise ValueError("Must not be NaN or Inf")
-        return val
+class GraphEnumerateRequest(GraphBudgetConfig):
+    """Request payload schema for Model B reachable state graph enumeration."""
+    pass
 
 
 @router.post("/graph/enumerate")
-def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
+def enumerate_state_space_graph(req: GraphBudgetConfig) -> Dict[str, Any]:
     """Model B: Computes the complete reachable state-space graph using authoritative ValidatedProblemBuilder."""
     from core.domains import registry
     from core.graph.enumerator import CompleteReachableGraphEnumerator
     from interpretation.router import RoutingOutcome
 
     # Explicit domain check for 404 compliance
-    if req.domain_id != "auto" and not registry.get(req.domain_id):
+    if req.domain_id and req.domain_id != "auto" and not registry.get(req.domain_id):
         raise HTTPException(status_code=404, detail=f"Domain '{req.domain_id}' not found.")
 
     builder = ValidatedProblemBuilder(registry=registry)
     build_res = builder.build_problem(
         prompt=req.prompt or "Stack the red box on the blue box.",
-        domain_id=req.domain_id if req.domain_id != "auto" else None,
-        problem_name=f"{req.domain_id}_task",
+        domain_id=req.domain_id if (req.domain_id and req.domain_id != "auto") else None,
+        problem_name=f"{req.domain_id or 'graph'}_task",
     )
 
     if not build_res.is_success or build_res.problem is None or build_res.domain is None:
-        if build_res.outcome == RoutingOutcome.NEEDS_CLARIFICATION:
+        status_val = build_res.status or (build_res.outcome.value if build_res.outcome else "UNSUPPORTED")
+        if build_res.outcome == RoutingOutcome.NEEDS_CLARIFICATION or status_val == "NEEDS_CLARIFICATION":
             return {
                 "status": "NEEDS_CLARIFICATION",
                 "clarification_question": build_res.clarification_question,
                 "explanation": build_res.error_message,
                 "elements": [],
             }
-        if build_res.status == "INVARIANT_VIOLATION":
+        if status_val == "INVARIANT_VIOLATION":
             return {
                 "status": "INVARIANT_VIOLATION",
                 "explanation": build_res.error_message,
                 "elements": [],
             }
         return {
-            "status": build_res.outcome.value if build_res.outcome else (build_res.status or "UNSUPPORTED"),
+            "status": status_val,
             "clarification_question": build_res.clarification_question,
             "explanation": build_res.error_message,
             "elements": [],
@@ -196,6 +177,13 @@ def enumerate_state_space_graph(req: GraphEnumerateRequest) -> Dict[str, Any]:
             timeout_seconds=req.timeout_seconds,
         )
         graph = enumerator.enumerate_graph(build_res.problem, build_res.domain)
+        if graph.stats.truncation_reason and "INITIAL_STATE_INVARIANT_VIOLATION" in graph.stats.truncation_reason:
+            return {
+                "status": "INVARIANT_VIOLATION",
+                "explanation": graph.stats.truncation_reason,
+                "elements": [],
+                "stats": graph.stats.model_dump(),
+            }
         return graph.to_cytoscape()
     finally:
         graph_concurrency_manager.release()

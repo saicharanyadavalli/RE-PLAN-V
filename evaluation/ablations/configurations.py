@@ -55,6 +55,9 @@ class AblationStudyRunner:
         if abl == "full":
             res = self.full_system.run(instance, domain, initial_candidate)
             res["ablation"] = "full"
+            res["repair_attempted"] = True
+            if "pure_repair_time_ms" not in res:
+                res["pure_repair_time_ms"] = res.get("repair_time_ms", 0.0)
             return res
 
         # 2. Without verifier (candidate is accepted without verification gate; actual success measured post-hoc)
@@ -70,6 +73,10 @@ class AblationStudyRunner:
                 "plan_cost": candidate.total_cost if eval_res.is_valid else float("inf"),
                 "planning_time_ms": candidate.planning_time_ms,
                 "verification_time_ms": 0.0,  # Ablation skipped verification during execution
+                "repair_attempted": False,
+                "repair_time_ms": None,
+                "pure_repair_time_ms": 0.0,
+                "attribution_correct": None,
                 "nodes_expanded": candidate.nodes_expanded,
                 "repair_iterations": 0,
                 "final_verification": eval_res,
@@ -87,6 +94,10 @@ class AblationStudyRunner:
                 "plan_cost": candidate.total_cost if v_res.is_valid else float("inf"),
                 "planning_time_ms": candidate.planning_time_ms,
                 "verification_time_ms": v_res.verification_time_ms,
+                "repair_attempted": False,
+                "repair_time_ms": None,
+                "pure_repair_time_ms": 0.0,
+                "attribution_correct": None,
                 "nodes_expanded": candidate.nodes_expanded,
                 "repair_iterations": 0,
                 "final_verification": v_res,
@@ -112,9 +123,14 @@ class AblationStudyRunner:
                 "plan_cost": replan_res.repaired_plan.total_cost if replan_res.repaired_plan and replan_res.success else float("inf"),
                 "planning_time_ms": replan_res.replanning_time_ms,
                 "verification_time_ms": replan_res.final_verification.verification_time_ms if replan_res.final_verification else 0.0,
+                "repair_attempted": True,
+                "repair_time_ms": replan_res.pure_repair_time_ms,
+                "pure_repair_time_ms": replan_res.pure_repair_time_ms,
+                "attribution_correct": None,
                 "nodes_expanded": replan_res.repaired_plan.nodes_expanded if replan_res.repaired_plan else 0,
                 "repair_iterations": replan_res.iterations,
                 "final_verification": replan_res.final_verification,
+                "attribution": replan_res.attribution,
             }
 
         # 5. Without attribution (attribution engine bypassed, always UNKNOWN_AMBIGUOUS)
@@ -143,9 +159,14 @@ class AblationStudyRunner:
                 "plan_cost": replan_res.repaired_plan.total_cost if replan_res.repaired_plan and replan_res.success else float("inf"),
                 "planning_time_ms": replan_res.replanning_time_ms,
                 "verification_time_ms": replan_res.final_verification.verification_time_ms if replan_res.final_verification else 0.0,
+                "repair_attempted": True,
+                "repair_time_ms": replan_res.pure_repair_time_ms,
+                "pure_repair_time_ms": replan_res.pure_repair_time_ms,
+                "attribution_correct": None,
                 "nodes_expanded": replan_res.repaired_plan.nodes_expanded if replan_res.repaired_plan else 0,
                 "repair_iterations": replan_res.iterations,
                 "final_verification": replan_res.final_verification,
+                "attribution": replan_res.attribution,
             }
 
         # 6. Generic regeneration (Baseline B3: blind regeneration without constraints)
@@ -157,6 +178,11 @@ class AblationStudyRunner:
                 domain=domain,
                 initial_candidate=candidate,
             )
+            repair_time = (
+                res.pure_repair_time_ms
+                if hasattr(res, "pure_repair_time_ms")
+                else res.replanning_time_ms
+            )
             return {
                 "ablation": "generic_regeneration",
                 "is_valid": res.success,
@@ -164,13 +190,22 @@ class AblationStudyRunner:
                 "plan_cost": res.repaired_plan.total_cost if res.repaired_plan and res.success else float("inf"),
                 "planning_time_ms": res.replanning_time_ms,
                 "verification_time_ms": res.final_verification.verification_time_ms if res.final_verification else 0.0,
+                "repair_attempted": True,
+                "repair_time_ms": repair_time,
+                "pure_repair_time_ms": getattr(res, "pure_repair_time_ms", 0.0),
+                "attribution_correct": None,
                 "nodes_expanded": res.repaired_plan.nodes_expanded if res.repaired_plan else 0,
                 "repair_iterations": res.iterations,
                 "final_verification": res.final_verification,
             }
 
         else:
-            return self.full_system.run(instance, domain, initial_candidate)
+            res = self.full_system.run(instance, domain, initial_candidate)
+            res["ablation"] = abl
+            res["repair_attempted"] = True
+            if "pure_repair_time_ms" not in res:
+                res["pure_repair_time_ms"] = res.get("repair_time_ms", 0.0)
+            return res
 
     def run_ablation_experiment(
         self,
@@ -206,9 +241,28 @@ class AblationStudyRunner:
             for v in variants:
                 res = self.run_ablation(v, inst, domain, initial_candidate=invalid_candidate)
                 res["initial_plan_was_invalid"] = True
-                res["repair_time_ms"] = res.get("planning_time_ms", 0.0)
                 if v == "full":
-                    res["attribution_correct"] = True
+                    pred_attr = res.get("attribution")
+                    if pred_attr:
+                        predicted = (
+                            pred_attr.fault_class
+                            if hasattr(pred_attr, "fault_class")
+                            else pred_attr
+                        )
+                        res["attribution_correct"] = (
+                            predicted == FaultClass.PLANNING_ERROR
+                            or predicted == "PLANNING_ERROR"
+                        )
+                    else:
+                        res["attribution_correct"] = False
+                elif v in (
+                    "without_attribution",
+                    "generic_regeneration",
+                    "without_verifier",
+                    "without_repair",
+                    "without_counterexample",
+                ):
+                    res["attribution_correct"] = None
                 collectors[v].record_run(res)
 
         results = {

@@ -44,6 +44,7 @@ from interpretation.llm.base import BaseLLMProvider
 from interpretation.llm.mock import MockLLMProvider
 from interpretation.validator.validator import ConsistencyValidator
 from interpretation.vision.detector import DeterministicSceneDetector
+from app.services.problem_builder import ValidatedProblemBuilder
 
 logger = get_logger("pipeline")
 
@@ -99,6 +100,7 @@ class PipelineOrchestrator:
         validator: Optional[ConsistencyValidator] = None,
         verifier: Optional[PlanVerifier] = None,
         replanning_engine: Optional[ReplanningEngine] = None,
+        problem_builder: Optional[ValidatedProblemBuilder] = None,
         max_interpret_retries: int = 3,
         max_backtracks: int = 2,
     ) -> None:
@@ -116,6 +118,11 @@ class PipelineOrchestrator:
         self.validator = validator or ConsistencyValidator()
         self.verifier = verifier or PlanVerifier()
         self.replanning_engine = replanning_engine or ReplanningEngine(verifier=self.verifier)
+        from app.services.problem_builder import ValidatedProblemBuilder
+        self.problem_builder = problem_builder or ValidatedProblemBuilder(
+            validator=self.validator,
+            llm_provider=self.llm_provider,
+        )
         self.cex_generator = CounterexampleGenerator()
         self.attribution_engine = FaultAttributionEngine()
         self.repair_generator = RepairGenerator()
@@ -387,25 +394,75 @@ class PipelineOrchestrator:
                     if obj.name not in proposal.entities:
                         proposal.entities[obj.name] = obj.object_type
 
-            # ─── Stage 2: VALIDATE (with retry-re-prompt) ─────────────
+            # ─── Stage 2: VALIDATE (via Authoritative Problem Builder) ─
             t1 = time.perf_counter()
-            val_res = self.validator.validate(proposal, active_domain)
+            build_res = self.problem_builder.build_from_proposal(
+                proposal,
+                active_domain,
+                routing_result=routing if 'routing' in locals() else None,
+            )
             t_val_ms = (time.perf_counter() - t1) * 1000.0
 
-            if not val_res.is_valid:
+            if not build_res.is_success:
+                if build_res.status == "INVARIANT_VIOLATION":
+                    elapsed = (time.perf_counter() - start_time) * 1000.0
+                    inv_err = build_res.error_message or "Initial state violates invariants"
+                    verif_err = VerificationResultSchema(
+                        is_valid=False,
+                        failed_step_index=0,
+                        explanation=f"Initial state violates invariants: {inv_err}" if not inv_err.startswith("Initial state violates") else inv_err,
+                    )
+                    inv_validation = build_res.validation_result or ProposalValidationResult(
+                        status=ValidationStatus.CONTRADICTION,
+                        is_valid=False,
+                        errors=[f"Initial state invariant violation: {inv_err}"],
+                        validated_proposal=None,
+                    )
+                    return PipelineExecutionResult(
+                        task_id=proposal.task_id,
+                        raw_prompt=prompt,
+                        status="INVARIANT_VIOLATION",
+                        domain_id=routed_domain_id,
+                        has_image=(image is not None),
+                        interpretation=build_res.proposal or proposal,
+                        validation=inv_validation,
+                        symbolic_problem_name="initial_state_invariant_violation",
+                        planner_algorithm=algorithm,
+                        candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=inv_err),
+                        initial_verification=verif_err,
+                        final_verification=verif_err,
+                        total_execution_time_ms=elapsed,
+                        decision_trace=trace,
+                    )
+
+                # Invalid proposal handling (status == "INVALID" or other validation errors)
+                val_errors = (
+                    build_res.validation_result.errors
+                    if build_res.validation_result and build_res.validation_result.errors
+                    else ([build_res.error_message] if build_res.error_message else ["Proposal validation failed"])
+                )
+                val_res = build_res.validation_result or ProposalValidationResult(
+                    status=ValidationStatus.SCHEMA_ERROR,
+                    is_valid=False,
+                    errors=val_errors,
+                    warnings=[],
+                    validated_proposal=None,
+                )
+                error_msg = build_res.error_message or "; ".join(val_errors)
+
                 trace.stage_trace.append(StageAttemptRecord(
                     stage="VALIDATE",
                     attempt=backtrack_idx + 1,
                     status=PipelineStageStatus.FAILED,
                     duration_ms=t_val_ms,
-                    error="; ".join(val_res.errors),
+                    error=error_msg,
                     recovery_action="retry_with_feedback" if backtrack_idx < self.max_backtracks else None,
                 ))
                 trace.validation_retries += 1
 
                 # If we can retry, feed errors back to interpretation
                 if backtrack_idx < self.max_backtracks:
-                    last_validation_errors = val_res.errors
+                    last_validation_errors = val_errors
                     trace.backtracks += 1
                     trace.recovery_path.append(f"backtrack_validation_errors_{backtrack_idx + 1}")
                     logger.info(f"Validation failed, backtracking to re-interpret (attempt {backtrack_idx + 2})")
@@ -418,7 +475,7 @@ class PipelineOrchestrator:
                 dummy_verif = VerificationResultSchema(
                     is_valid=False,
                     failed_step_index=0,
-                    explanation=f"Validation failed after {trace.backtracks} retries: {val_res.errors}",
+                    explanation=f"Validation failed after {trace.backtracks} retries: {val_errors}",
                 )
                 return PipelineExecutionResult(
                     task_id=proposal.task_id,
@@ -444,43 +501,20 @@ class PipelineOrchestrator:
                 status=PipelineStageStatus.SUCCESS,
                 duration_ms=t_val_ms,
             ))
+            proposal = build_res.proposal or proposal
+            problem = build_res.problem
+            val_res = build_res.validation_result or ProposalValidationResult(
+                status=ValidationStatus.VALID,
+                is_valid=True,
+                errors=[],
+                warnings=[],
+                validated_proposal=proposal,
+            )
             best_proposal = proposal
             best_validation = val_res
             best_provider_name = provider_name
 
             # ─── Stage 3: PLAN (with cascade) ─────────────────────────
-            problem = self.validator.convert_to_problem(proposal, active_domain)
-
-            # Fail-closed invariant validation on the initial state before search
-            ok_init, err_init = problem.check_invariants(problem.initial_state)
-            if not ok_init:
-                elapsed = (time.perf_counter() - start_time) * 1000.0
-                verif_err = VerificationResultSchema(
-                    is_valid=False,
-                    failed_step_index=0,
-                    explanation=f"Initial state violates invariants: {err_init}",
-                )
-                return PipelineExecutionResult(
-                    task_id=proposal.task_id,
-                    raw_prompt=prompt,
-                    status="INVARIANT_VIOLATION",
-                    domain_id=routed_domain_id,
-                    has_image=(image is not None),
-                    interpretation=proposal,
-                    validation=ProposalValidationResult(
-                        status=ValidationStatus.CONTRADICTION,
-                        is_valid=False,
-                        errors=[f"Initial state invariant violation: {err_init}"],
-                        validated_proposal=None,
-                    ),
-                    symbolic_problem_name="initial_state_invariant_violation",
-                    planner_algorithm=algorithm,
-                    candidate_plan=PlanSchema(actions=[], is_success=False, failure_reason=err_init),
-                    initial_verification=verif_err,
-                    final_verification=verif_err,
-                    total_execution_time_ms=elapsed,
-                    decision_trace=trace,
-                )
 
             # Build planner cascade: start with requested algorithm, then add others
             cascade = [algorithm]
