@@ -249,6 +249,9 @@ def get_providers_status() -> Dict[str, Any]:
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
     gemini_model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 
+    nvidia_key = (os.environ.get("NVIDIA_API_KEY") or "").strip()
+    nvidia_model = os.environ.get("NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+
     # Probe LM Studio
     lm_studio_url = os.environ.get("LM_STUDIO_URL", "http://127.0.0.1:1234")
     lm_studio_online = False
@@ -280,6 +283,12 @@ def get_providers_status() -> Dict[str, Any]:
                 "model": gemini_model,
                 "has_key": bool(gemini_key),
                 "key_preview": f"{gemini_key[:4]}...{gemini_key[-4:]}" if len(gemini_key) > 8 else ("Set" if gemini_key else "Missing (add to .env)"),
+            },
+            "nvidia": {
+                "name": "NVIDIA NIM Cloud",
+                "model": nvidia_model,
+                "has_key": bool(nvidia_key),
+                "key_preview": f"{nvidia_key[:4]}...{nvidia_key[-4:]}" if len(nvidia_key) > 8 else ("Set" if nvidia_key else "Missing (add to .env)"),
             },
             "openai": {
                 "name": "OpenAI Compatible Endpoint",

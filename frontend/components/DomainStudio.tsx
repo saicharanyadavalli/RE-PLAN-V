@@ -19,9 +19,21 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
         const resp = await fetch(`${getApiBaseUrl()}/api/domains`);
         if (resp.ok) {
           const data = await resp.json();
-          setDomains(data);
-          if (data.length > 0) {
-            setSelectedDomainId(data[0].domain_id);
+          const mapped: DomainMetadata[] = data.map((d: any) => ({
+            domain_id: d.domain_id,
+            display_name: d.display_name || d.name || d.domain_id,
+            description: d.description || "",
+            complexity_rating: d.complexity_rating || "Standard STRIPS",
+            entity_types: d.entity_types || [],
+            action_names: Array.isArray(d.action_names) ? d.action_names : (d.actions ? d.actions.map((a: any) => typeof a === 'string' ? a : a.name) : []),
+            predicate_names: Array.isArray(d.predicate_names) ? d.predicate_names : (d.predicates ? d.predicates.map((p: any) => typeof p === 'string' ? p : p.name) : []),
+            example_tasks: Array.isArray(d.example_tasks) ? d.example_tasks : (d.task_examples ? d.task_examples.map((t: any) => typeof t === 'string' ? t : t.prompt) : []),
+            supported_features: d.supported_features || d.supported_patterns || [],
+            unsupported_features: d.unsupported_features || [],
+          }));
+          setDomains(mapped);
+          if (mapped.length > 0) {
+            setSelectedDomainId(mapped[0].domain_id);
           }
         }
       } catch (err) {
@@ -176,7 +188,7 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
                 {dom.domain_id}
               </span>
               <span className="mt-2 text-[10px] rounded bg-slate-800/80 px-1.5 py-0.5 text-slate-400 border border-slate-700/60">
-                {dom.action_names.length} Actions
+                {dom.action_names?.length || 0} Actions
               </span>
             </button>
           );
@@ -212,10 +224,10 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
                 <span className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  Entity Types ({activeDomain.entity_types.length})
+                  Entity Types ({activeDomain.entity_types?.length || 0})
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {activeDomain.entity_types.map((type, idx) => (
+                  {(activeDomain.entity_types || []).map((type, idx) => (
                     <span
                       key={idx}
                       className="font-mono text-xs rounded bg-slate-800 px-2 py-0.5 text-cyan-300 border border-slate-700"
@@ -228,10 +240,10 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
 
               <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
                 <span className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  State Predicates ({activeDomain.predicate_names.length})
+                  State Predicates ({activeDomain.predicate_names?.length || 0})
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {activeDomain.predicate_names.map((pred, idx) => (
+                  {(activeDomain.predicate_names || []).map((pred, idx) => (
                     <span
                       key={idx}
                       className="font-mono text-xs rounded bg-slate-800 px-2 py-0.5 text-emerald-300 border border-slate-700"
@@ -246,10 +258,10 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
             {/* Action Schemas (Operators) */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
               <span className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Ground Action Operators ({activeDomain.action_names.length})
+                Ground Action Operators ({activeDomain.action_names?.length || 0})
               </span>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                {activeDomain.action_names.map((actionName, idx) => (
+                {(activeDomain.action_names || []).map((actionName, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 p-3"
@@ -274,7 +286,7 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
                 Pre-Tested Example Instructions
               </span>
               <div className="flex flex-col gap-2.5">
-                {activeDomain.example_tasks.map((task, idx) => (
+                {(activeDomain.example_tasks || []).map((task, idx) => (
                   <div
                     key={idx}
                     className="group flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3.5 hover:border-cyan-500/50 transition"
@@ -307,7 +319,7 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
                     Guaranteed Formal Guarantees:
                   </span>
                   <ul className="flex flex-col gap-1 text-xs text-slate-300">
-                    {activeDomain.supported_features.map((feat, idx) => (
+                    {(activeDomain.supported_features || []).map((feat, idx) => (
                       <li key={idx} className="flex items-center gap-2">
                         <span className="text-emerald-400 font-bold">&check;</span>
                         <span>{feat}</span>
@@ -321,7 +333,7 @@ export function DomainStudio({ onSelectPrompt }: DomainStudioProps) {
                     Explicit Out-of-Scope (No Hallucinations):
                   </span>
                   <ul className="flex flex-col gap-1 text-xs text-slate-400">
-                    {activeDomain.unsupported_features.map((feat, idx) => (
+                    {(activeDomain.unsupported_features || []).map((feat, idx) => (
                       <li key={idx} className="flex items-center gap-2">
                         <span className="text-amber-500 font-bold">&times;</span>
                         <span>{feat}</span>

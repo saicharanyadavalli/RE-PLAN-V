@@ -203,15 +203,16 @@ export function TaskControlPanel({
             <select
               value={domainId}
               onChange={(e) => setDomainId(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+              style={{ colorScheme: "dark" }}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs font-medium text-slate-100 focus:border-cyan-500 focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
             >
-              <option value="auto">&rarr; Auto-Route via NLP Router</option>
-              <option value="blocks_world">Blocks World (4 Classical Operators)</option>
-              <option value="grid_world">Grid World (2D Spatial Navigation)</option>
-              <option value="household">Household Robotics (Multi-Room / Storage)</option>
-              <option value="warehouse">Warehouse Logistics (AGVs / Storage Racks)</option>
-              <option value="scheduling">Discrete Job Scheduling (Machine Allocation)</option>
-              <option value="software_workflow">Software Workflow (Gated CI/CD Release)</option>
+              <option value="auto" className="bg-slate-900 text-slate-100 py-1.5">&rarr; Auto-Route via NLP Router</option>
+              <option value="blocks_world" className="bg-slate-900 text-slate-100 py-1.5">Blocks World (4 Classical Operators)</option>
+              <option value="grid_world" className="bg-slate-900 text-slate-100 py-1.5">Grid World (2D Spatial Navigation)</option>
+              <option value="household" className="bg-slate-900 text-slate-100 py-1.5">Household Robotics (Multi-Room / Storage)</option>
+              <option value="warehouse" className="bg-slate-900 text-slate-100 py-1.5">Warehouse Logistics (AGVs / Storage Racks)</option>
+              <option value="scheduling" className="bg-slate-900 text-slate-100 py-1.5">Discrete Job Scheduling (Machine Allocation)</option>
+              <option value="software_workflow" className="bg-slate-900 text-slate-100 py-1.5">Software Workflow (Gated CI/CD Release)</option>
             </select>
           </div>
 
@@ -223,11 +224,12 @@ export function TaskControlPanel({
             <select
               value={algorithm}
               onChange={(e) => setAlgorithm(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+              style={{ colorScheme: "dark" }}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs font-medium text-slate-100 focus:border-cyan-500 focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
             >
-              <option value="A*">A* Search (Optimal Uniform-Cost / Admissible)</option>
-              <option value="BFS">Breadth-First Search (BFS)</option>
-              <option value="BEST_FIRST">Greedy Best-First Search</option>
+              <option value="A*" className="bg-slate-900 text-slate-100 py-1.5">A* Search (Optimal Uniform-Cost / Admissible)</option>
+              <option value="BFS" className="bg-slate-900 text-slate-100 py-1.5">Breadth-First Search (BFS)</option>
+              <option value="BEST_FIRST" className="bg-slate-900 text-slate-100 py-1.5">Greedy Best-First Search</option>
             </select>
           </div>
         </div>
@@ -242,13 +244,15 @@ export function TaskControlPanel({
             <select
               value={providerType}
               onChange={(e) => setProviderType(e.target.value)}
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 p-2.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none"
+              style={{ colorScheme: "dark" }}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 p-2.5 text-xs font-medium text-slate-100 focus:border-cyan-500 focus:outline-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-slate-100"
             >
-              <option value="mock">Deterministic Zero-API (Offline)</option>
-              <option value="lmstudio">LM Studio Local Model (http://127.0.0.1:1234)</option>
-              <option value="ollama">Local 2B Model (Ollama: gemma2:2b / qwen2.5)</option>
-              <option value="gemini">Google Gemini 1.5 Flash (via API Key)</option>
-              <option value="openai">OpenAI Endpoint (gpt-4o-mini)</option>
+              <option value="mock" className="bg-slate-900 text-slate-100 py-1.5">Deterministic Zero-API (Offline)</option>
+              <option value="nvidia" className="bg-slate-900 text-slate-100 py-1.5">NVIDIA NIM Cloud (meta/llama-3.1-8b-instruct)</option>
+              <option value="lmstudio" className="bg-slate-900 text-slate-100 py-1.5">LM Studio Local Model (http://127.0.0.1:1234)</option>
+              <option value="ollama" className="bg-slate-900 text-slate-100 py-1.5">Local 2B Model (Ollama: gemma2:2b / qwen2.5)</option>
+              <option value="gemini" className="bg-slate-900 text-slate-100 py-1.5">Google Gemini 1.5 Flash (via API Key)</option>
+              <option value="openai" className="bg-slate-900 text-slate-100 py-1.5">OpenAI Endpoint (gpt-4o-mini)</option>
             </select>
           </div>
 

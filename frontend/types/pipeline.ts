@@ -180,12 +180,21 @@ export interface PipelineStreamEvent {
   data: Record<string, any>;
 }
 
+export type LLMProviderType =
+  | "mock"
+  | "lmstudio"
+  | "ollama"
+  | "gemini"
+  | "openai"
+  | "nvidia"
+  | string;
+
 export interface PipelineRunRequest {
   prompt: string;
   algorithm: string;
   domain_id?: string;
   force_fault: boolean;
-  provider_type: string;
+  provider_type: LLMProviderType;
   llm_model?: string;
   enumerate_graph?: boolean;
   max_nodes?: number;
