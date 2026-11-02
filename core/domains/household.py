@@ -211,3 +211,11 @@ class HouseholdRoboticsDomain(BaseDomain):
                 "real hardware motor control", "joint torque estimation", "RGB-D point cloud registration"
             ],
         )
+        # Provide both 'navigate_room' and 'navigate' alias for domain operator lookup
+        self.actions["navigate"] = navigate
+
+    def get_action(self, name: str) -> Optional[ActionDefinition]:
+        n = name.strip().lower()
+        if n == "navigate":
+            return self.actions.get("navigate_room") or self.actions.get("navigate")
+        return self.actions.get(n)

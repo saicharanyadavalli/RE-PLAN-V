@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from core.actions.definition import ActionDefinition, ActionParameter
 from core.domains.base import BaseDomain
-from core.world.constraints import FunctionalDependencyInvariant
+from core.world.constraints import FunctionalDependencyInvariant, PrecedenceInvariant
 from core.world.predicates import Fact, PredicateDefinition
 from core.world.types import TypeHierarchy
 
@@ -27,6 +27,17 @@ class SchedulingDomain(BaseDomain):
             PredicateDefinition("job_assigned", ["job", "resource", "slot"]),
             PredicateDefinition("precedes", ["job", "job"], is_static=True),
         ]
+
+        def _check_independent_job_applicability(state: Any, args: Sequence[str]) -> Tuple[bool, Optional[str]]:
+            if not args:
+                return True, None
+            j = args[0]
+            # A job with a predecessor constraint cannot be scheduled as an independent job;
+            # it must be scheduled using schedule_dependent_job after its prerequisite completes.
+            for f in state.facts:
+                if f.predicate == "precedes" and len(f.arguments) >= 2 and f.arguments[1] == j:
+                    return False, f"Job '{j}' has predecessor constraint and must use schedule_dependent_job"
+            return True, None
 
         schedule_independent = ActionDefinition(
             name="schedule_independent_job",
@@ -50,6 +61,7 @@ class SchedulingDomain(BaseDomain):
             ],
             cost=1.0,
             description="Assign and complete an independent job on an available resource slot",
+            applicability_check=_check_independent_job_applicability,
         )
 
         schedule_dependent = ActionDefinition(
@@ -100,7 +112,7 @@ class SchedulingDomain(BaseDomain):
             type_hierarchy=th,
             predicates=preds,
             actions=[schedule_independent, schedule_dependent],
-            default_invariants=[FunctionalDependencyInvariant("job_assigned", 0, 1)],
+            default_invariants=[FunctionalDependencyInvariant("job_assigned", 0, 1), PrecedenceInvariant()],
             task_examples=examples,
             supported_patterns=[
                 "schedule", "allocate", "machine", "job", "slot", "resource", "precedence", "task", "timeline"
@@ -109,3 +121,21 @@ class SchedulingDomain(BaseDomain):
                 "continuous millisecond jitter scheduling", "mixed-integer non-linear programming"
             ],
         )
+
+    def applicable_actions(
+        self, state: Any, registry: Any
+    ) -> List[Any]:
+        """Filters out independent job actions when a job has an uncompleted predecessor."""
+        actions = super().applicable_actions(state, registry)
+        filtered = []
+        for act in actions:
+            if act.name == "schedule_independent_job" and act.arguments:
+                j = act.arguments[0]
+                has_predecessor = any(
+                    f.predicate == "precedes" and len(f.arguments) >= 2 and f.arguments[1] == j
+                    for f in state.facts
+                )
+                if has_predecessor:
+                    continue
+            filtered.append(act)
+        return filtered

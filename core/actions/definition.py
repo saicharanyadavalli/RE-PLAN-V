@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from core.contracts import ActionDefSchema, FactSchema
 from core.world.predicates import Fact
 
@@ -38,6 +38,7 @@ class ActionDefinition:
         del_effects: Sequence[Fact],
         cost: float = 1.0,
         description: str = "",
+        applicability_check: Optional[Callable[[Any, Sequence[str]], Tuple[bool, Optional[str]]]] = None,
     ) -> None:
         self.name = name.strip().lower()
         self.parameters = tuple(parameters)
@@ -46,6 +47,7 @@ class ActionDefinition:
         self.del_effects = tuple(del_effects)
         self.cost = float(cost)
         self.description = description
+        self.applicability_check = applicability_check
 
     def instantiate(self, binding: Dict[str, str]) -> "GroundAction":
         """Instantiates lifted action into a concrete GroundAction using parameter binding."""
@@ -69,6 +71,7 @@ class ActionDefinition:
             del_effects=ground_dels,
             cost=self.cost,
             parent_schema=self,
+            applicability_check=self.applicability_check,
         )
 
     def to_schema(self) -> ActionDefSchema:

@@ -62,6 +62,25 @@ class FunctionalDependencyInvariant(Invariant):
         return True, None
 
 
+class PrecedenceInvariant(Invariant):
+    """Enforces that if precedes(j_prior, j) holds, job j cannot be completed unless j_prior has completed."""
+
+    def __init__(self, description: str = "Precedence ordering invariant") -> None:
+        super().__init__(name="precedence_ordering_invariant", description=description)
+
+    def check(self, state: SymbolicState) -> Tuple[bool, Optional[str]]:
+        completed_jobs = {f.arguments[0] for f in state.facts if f.predicate == "job_completed" and f.arguments}
+        for f in state.facts:
+            if f.predicate == "precedes" and len(f.arguments) >= 2:
+                prior_j, dep_j = f.arguments[0], f.arguments[1]
+                if dep_j in completed_jobs and prior_j not in completed_jobs:
+                    return (
+                        False,
+                        f"Precedence invariant violated: job '{dep_j}' completed before prerequisite '{prior_j}'.",
+                    )
+        return True, None
+
+
 class HardConstraint(ABC):
     """Action or transition-level constraint (e.g., never execute an action touching a fragile item)."""
 
@@ -180,7 +199,12 @@ class ForbidTransitionConstraint(HardConstraint):
         self.from_entity = from_entity.strip() if from_entity else None
 
     def check_action(self, state: SymbolicState, action_name: str, action_args: Sequence[str]) -> Tuple[bool, Optional[str]]:
-        if action_name.strip().lower() == self.forbidden_action:
+        act = action_name.strip().lower()
+        matches_action = (
+            act == self.forbidden_action
+            or (self.forbidden_action in ("navigate", "navigate_room") and act in ("navigate", "navigate_room"))
+        )
+        if matches_action:
             if 0 <= self.arg_index < len(action_args):
                 if action_args[self.arg_index] == self.to_entity:
                     if self.from_entity is None:

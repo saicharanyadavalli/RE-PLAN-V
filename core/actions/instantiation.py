@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from core.contracts import GroundActionSchema
 from core.world.predicates import Fact
 from core.world.state import SymbolicState
@@ -20,6 +20,7 @@ class GroundAction:
         "cost",
         "parent_schema",
         "_hash",
+        "applicability_check",
     )
 
     def __init__(
@@ -31,6 +32,7 @@ class GroundAction:
         del_effects: Sequence[Fact],
         cost: float = 1.0,
         parent_schema: Optional[Any] = None,
+        applicability_check: Optional[Callable[[SymbolicState, Sequence[str]], Tuple[bool, Optional[str]]]] = None,
     ) -> None:
         self.name = name.strip().lower()
         self.arguments = tuple(arg.strip() for arg in arguments)
@@ -39,6 +41,7 @@ class GroundAction:
         self.del_effects = tuple(del_effects)
         self.cost = float(cost)
         self.parent_schema = parent_schema
+        self.applicability_check = applicability_check
         self._hash = hash((self.name, self.arguments))
 
     def is_applicable(self, state: SymbolicState) -> Tuple[bool, Optional[Fact]]:
@@ -46,6 +49,10 @@ class GroundAction:
         for pre in self.preconditions:
             if not state.holds(pre):
                 return False, pre
+        if self.applicability_check is not None:
+            ok, msg = self.applicability_check(state, self.arguments)
+            if not ok:
+                return False, Fact("applicability_violated", [self.name, msg or "condition unmet"])
         return True, None
 
     def to_schema(self) -> GroundActionSchema:

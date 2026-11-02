@@ -357,10 +357,10 @@ class DomainRouter:
                 typed_constraints.append(
                     TaskConstraintSchema(
                         constraint_type=TaskConstraintType.FORBID_TRANSITION,
-                        action_name="move",
+                        action_name="navigate_room",
                         to_entity=loc_clean,
                         arg_index=2,
-                        description=f"Do not move robot to {loc_clean}",
+                        description=f"Do not navigate robot to {loc_clean}",
                         source_text=text,
                     )
                 )
@@ -647,9 +647,21 @@ class DomainRouter:
         pkg_id = pkg_matches[0] if pkg_matches else f"pkg_{commit_id}"
         entities[pkg_id] = "artifact"
 
-        # Environment extraction
-        env_matches = re.findall(r"\b(staging|production|prod|qa|testing|test|dev|canary|env_[a-z0-9_]+)\b", text)
-        env_id = env_matches[0] if env_matches else "staging"
+        # Environment extraction: prioritize target prepositions (e.g., "to staging") and avoid action verbs like "test"
+        target_match = re.search(
+            r"\b(?:to|into|in|target|env|environment)\s+(?:the\s+)?(staging|production|prod|qa|test_env|testing_env|dev|canary|env_[a-z0-9_]+|test|testing)\b",
+            text,
+        )
+        if target_match:
+            env_id = target_match.group(1)
+        else:
+            env_matches = re.findall(r"\b(staging|production|prod|qa|dev|canary|env_[a-z0-9_]+|test_env|testing_env)\b", text)
+            if env_matches:
+                env_id = env_matches[0]
+            else:
+                fallback_matches = re.findall(r"\b(test|testing)\b", text)
+                env_id = fallback_matches[0] if fallback_matches else "staging"
+
         if env_id == "prod":
             env_id = "production"
         entities[env_id] = "environment"
